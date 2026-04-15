@@ -6,8 +6,8 @@ MVP implementation of a real-time multiplayer GIF guessing game. React frontend,
 
 ## Tasks
 
-- [ ] 1. Project scaffolding and database setup
-  - [ ] 1.1 Initialize monorepo with server (Node.js/Express/TypeScript) and client (React/TypeScript) packages
+- [-] 1. Project scaffolding and database setup
+  - [x] 1.1 Initialize monorepo with server (Node.js/Express/TypeScript) and client (React/TypeScript) packages
     - Set up `server/` and `client/` directories with `tsconfig.json`, `package.json`
     - Install core dependencies: express, socket.io, pg, fast-check (dev), vitest (dev), supabase-js
     - Install client dependencies: react, react-dom, socket.io-client, @supabase/supabase-js
