@@ -2,11 +2,19 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import authRoutes from './routes/auth';
+import lobbyRoutes from './routes/lobbies';
+import leaderboardRoutes from './routes/leaderboard';
+import adminRoutes from './routes/admin';
+import { initSocketServer } from './socket';
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Initialize Socket.IO on the HTTP server
+const io = initSocketServer(server);
 
 app.use(cors());
 app.use(express.json());
@@ -14,6 +22,11 @@ app.use(express.json());
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+app.use('/api/auth', authRoutes);
+app.use('/api/lobbies', lobbyRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/admin', adminRoutes);
 
 const PORT = process.env.PORT || 3001;
 
@@ -23,4 +36,4 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-export { app, server };
+export { app, server, io };
