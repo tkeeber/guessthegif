@@ -8,6 +8,7 @@ import {
 } from 'react';
 import type { User, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 
 interface AuthState {
   user: User | null;
@@ -26,19 +27,55 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Ensure a player profile exists in the backend for the given Supabase user.
+ * Called on both signup and login to handle cases where the profile wasn't
+ * created during signup (e.g. email confirmation flow, production URL issues).
+ */
+async function ensurePlayerProfile(user: User, username?: string): Promise<void> {
+  try {
+    // Check if profile already exists
+    await apiFetch('/api/auth/me');
+  } catch {
+    // Profile doesn't exist — create it
+    try {
+      await apiFetch('/api/auth/callback', {
+        method: 'POST',
+        body: JSON.stringify({
+          supabaseUserId: user.id,
+          email: user.email,
+          username: username || user.email?.split('@')[0] || 'player',
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to create player profile:', err);
+    }
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, loading: true });
 
   // Bootstrap: check for an existing session on mount
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setState({ user: session?.user ?? null, loading: false });
+      const user = session?.user ?? null;
+      setState({ user, loading: false });
+      // Auto-sync profile on session restore
+      if (user) {
+        ensurePlayerProfile(user);
+      }
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setState((prev) => ({ ...prev, user: session?.user ?? null }));
+      const user = session?.user ?? null;
+      setState((prev) => ({ ...prev, user }));
+      // Auto-sync profile on auth state change (login, token refresh)
+      if (user && _event === 'SIGNED_IN') {
+        ensurePlayerProfile(user);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -54,34 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) return { error };
 
-      // Create player profile via the server callback endpoint
-      const session = data.session;
-      if (session) {
-        try {
-          const res = await fetch('/api/auth/callback', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              supabaseUserId: data.user?.id,
-              email,
-              username,
-            }),
-          });
-
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            return {
-              error: new Error(
-                (body as { message?: string }).message ?? 'Failed to create player profile'
-              ),
-            };
-          }
-        } catch {
-          return { error: new Error('Network error while creating player profile') };
-        }
+      // Create player profile if session is immediately available
+      if (data.session && data.user) {
+        await ensurePlayerProfile(data.user, username);
       }
 
       return { error: null };
