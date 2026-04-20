@@ -1,8 +1,12 @@
 import { supabase } from './supabase';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
 /**
  * Authenticated fetch helper.
  * Automatically attaches the current Supabase access token as a Bearer token.
+ * In production, prepends the backend URL (VITE_API_BASE_URL).
+ * In dev, the Vite proxy handles /api → backend.
  */
 export async function apiFetch<T>(
   path: string,
@@ -21,7 +25,8 @@ export async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${session.access_token}`;
   }
 
-  const res = await fetch(path, { ...options, headers });
+  const url = `${API_BASE_URL}${path}`;
+  const res = await fetch(url, { ...options, headers });
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

@@ -16,7 +16,11 @@ const server = http.createServer(app);
 // Initialize Socket.IO on the HTTP server
 const io = initSocketServer(server);
 
-app.use(cors());
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
+  : ['http://localhost:5173'];
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => {

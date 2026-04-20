@@ -78,9 +78,14 @@ const disconnectTimers = new Map<string, NodeJS.Timeout>();
  * on handshake, room management, rate limiting, and disconnect handling.
  */
 export function initSocketServer(httpServer: HttpServer): TypedServer {
+  const allowedOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',')
+    : ['http://localhost:5173'];
+
   const io: TypedServer = new Server(httpServer, {
     cors: {
-      origin: '*',
+      origin: allowedOrigins,
+      credentials: true,
     },
   });
 
