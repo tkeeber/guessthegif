@@ -78,9 +78,11 @@ const disconnectTimers = new Map<string, NodeJS.Timeout>();
  */
 async function broadcastLobbyUpdate(io: TypedServer, lobbyId: string): Promise<void> {
   const result = await pool.query(
-    `SELECT p.id AS player_id, p.username
+    `SELECT p.id AS player_id, p.username,
+            CASE WHEN l.host_id = p.id THEN true ELSE false END AS is_host
        FROM lobby_players lp
        JOIN players p ON p.id = lp.player_id
+       JOIN lobbies l ON l.id = lp.lobby_id
       WHERE lp.lobby_id = $1
       ORDER BY lp.joined_at ASC`,
     [lobbyId]
@@ -89,7 +91,7 @@ async function broadcastLobbyUpdate(io: TypedServer, lobbyId: string): Promise<v
   io.to(lobbyId).emit('lobby:update', {
     players: result.rows.map((row) => ({
       playerId: row.player_id,
-      username: row.username,
+      username: row.is_host ? `${row.username} (host)` : row.username,
     })),
   });
 }
