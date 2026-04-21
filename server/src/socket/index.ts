@@ -74,6 +74,27 @@ const DISCONNECT_TIMEOUT_MS = 30_000; // 30 seconds
 const disconnectTimers = new Map<string, NodeJS.Timeout>();
 
 /**
+ * Broadcast the current player list for a lobby to all connected sockets in that room.
+ */
+async function broadcastLobbyUpdate(io: TypedServer, lobbyId: string): Promise<void> {
+  const result = await pool.query(
+    `SELECT p.id AS player_id, p.username
+       FROM lobby_players lp
+       JOIN players p ON p.id = lp.player_id
+      WHERE lp.lobby_id = $1
+      ORDER BY lp.joined_at ASC`,
+    [lobbyId]
+  );
+
+  io.to(lobbyId).emit('lobby:update', {
+    players: result.rows.map((row) => ({
+      playerId: row.player_id,
+      username: row.username,
+    })),
+  });
+}
+
+/**
  * Initialize Socket.IO on the HTTP server with Supabase JWT authentication
  * on handshake, room management, rate limiting, and disconnect handling.
  */
@@ -142,6 +163,11 @@ export function initSocketServer(httpServer: HttpServer): TypedServer {
     const lobbyId = socket.handshake.query.lobbyId as string | undefined;
     if (lobbyId) {
       socket.join(lobbyId);
+
+      // Broadcast updated player list to everyone in the lobby
+      broadcastLobbyUpdate(io, lobbyId).catch((err) =>
+        console.error('lobby:update broadcast error:', err)
+      );
     }
 
     // Register event handlers
@@ -151,6 +177,13 @@ export function initSocketServer(httpServer: HttpServer): TypedServer {
 
     // Handle disconnect
     socket.on('disconnect', () => {
+      // Broadcast updated player list immediately
+      if (lobbyId) {
+        broadcastLobbyUpdate(io, lobbyId).catch((err) =>
+          console.error('lobby:update broadcast error on disconnect:', err)
+        );
+      }
+
       // Start a 30-second timer. If the player doesn't reconnect, remove them.
       const timer = setTimeout(async () => {
         disconnectTimers.delete(playerId);
