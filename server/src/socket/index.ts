@@ -88,12 +88,23 @@ async function broadcastLobbyUpdate(io: TypedServer, lobbyId: string): Promise<v
     [lobbyId]
   );
 
+  // Get the host's supabase_user_id so the client can match it
+  const hostResult = await pool.query(
+    `SELECT p.supabase_user_id
+       FROM lobbies l
+       JOIN players p ON p.id = l.host_id
+      WHERE l.id = $1`,
+    [lobbyId]
+  );
+  const hostSupabaseId = hostResult.rows[0]?.supabase_user_id ?? '';
+
   io.to(lobbyId).emit('lobby:update', {
     players: result.rows.map((row) => ({
       playerId: row.player_id,
       username: row.is_host ? `${row.username} (host)` : row.username,
     })),
-  });
+    hostSupabaseId,
+  } as any);
 }
 
 /**

@@ -29,12 +29,8 @@ export default function LobbyPage({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
+  const [isHost, setIsHost] = useState(!hostId);
   const socketRef = useRef<Socket | null>(null);
-
-  // Determine if the current user is the host.
-  // hostId may be a player-table id while currentUserId is a supabase user id,
-  // so we also treat empty hostId (creator just created) as "is host".
-  const isHost = !hostId || hostId === currentUserId;
 
   const connectSocket = useCallback(async () => {
     try {
@@ -50,8 +46,11 @@ export default function LobbyPage({
         setConnected(false);
       });
 
-      socket.on('lobby:update', (payload: { players: LobbyPlayer[] }) => {
+      socket.on('lobby:update', (payload: { players: LobbyPlayer[]; hostSupabaseId?: string }) => {
         setPlayers(payload.players);
+        if (payload.hostSupabaseId) {
+          setIsHost(payload.hostSupabaseId === currentUserId);
+        }
       });
 
       socket.on('round:start', () => {
