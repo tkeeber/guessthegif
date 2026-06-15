@@ -51,6 +51,7 @@ export async function getRankings(seasonId: string): Promise<LeaderboardEntry[]>
        FROM season_scores ss
        JOIN players p ON p.id = ss.player_id
       WHERE ss.season_id = $1
+        AND p.is_bot = false
       ORDER BY ss.correct_guess_count DESC, ss.last_correct_at ASC`,
     [seasonId]
   );

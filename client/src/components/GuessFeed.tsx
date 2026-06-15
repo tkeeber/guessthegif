@@ -1,4 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { colors, radii, fonts } from '../styles/theme';
+
+const BOT_PREFIXES = ['NoviceBot_', 'IntermediateBot_', 'ExpertBot_'];
+
+function isBot(username: string): boolean {
+  return BOT_PREFIXES.some((prefix) => username.startsWith(prefix));
+}
 
 export interface FeedEntry {
   id: string;
@@ -74,6 +81,7 @@ export default function GuessFeed({
             <div style={styles.entryHeader}>
               <span style={styles.username}>
                 {entry.username}
+                {isBot(entry.username) && <span style={styles.botBadge}> 🤖</span>}
                 {entry.isCorrect && <span style={styles.correctBadge}> ✓ Correct!</span>}
               </span>
               <span style={styles.timestamp}>{formatTime(entry.timestamp)}</span>
@@ -123,6 +131,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     height: '100%',
     minHeight: 0,
+    fontFamily: fonts.base,
   },
   feed: {
     flex: 1,
@@ -133,12 +142,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 4,
     minHeight: 120,
     maxHeight: 300,
-    border: '1px solid #e0e0e0',
-    borderRadius: 8,
-    background: '#fafafa',
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.input,
+    background: colors.surface,
   },
   empty: {
-    color: '#999',
+    color: colors.textMuted,
     fontSize: 14,
     textAlign: 'center',
     padding: 16,
@@ -147,16 +156,16 @@ const styles: Record<string, React.CSSProperties> = {
   entry: {
     padding: '6px 10px',
     borderRadius: 6,
-    background: '#fff',
-    border: '1px solid #eee',
+    background: colors.inputBg,
+    border: `1px solid ${colors.inputBorder}`,
   },
   correctEntry: {
-    background: '#ecfdf5',
-    border: '1px solid #6ee7b7',
+    background: 'rgba(34, 197, 94, 0.1)',
+    border: `1px solid ${colors.success}`,
   },
   chatEntry: {
-    background: '#f0f4ff',
-    border: '1px solid #c7d2fe',
+    background: 'rgba(124, 58, 237, 0.1)',
+    border: `1px solid ${colors.primary}`,
   },
   entryHeader: {
     display: 'flex',
@@ -167,24 +176,27 @@ const styles: Record<string, React.CSSProperties> = {
   username: {
     fontWeight: 600,
     fontSize: 13,
-    color: '#333',
+    color: colors.textPrimary,
   },
   correctBadge: {
-    color: '#16a34a',
+    color: colors.success,
     fontWeight: 700,
     fontSize: 12,
   },
   timestamp: {
     fontSize: 11,
-    color: '#999',
+    color: colors.textMuted,
   },
   entryText: {
     fontSize: 14,
-    color: '#444',
+    color: colors.textSecondary,
     wordBreak: 'break-word' as const,
   },
   chatPrefix: {
     fontSize: 13,
+  },
+  botBadge: {
+    fontSize: 12,
   },
   inputRow: {
     display: 'flex',
@@ -195,20 +207,22 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     padding: '10px 12px',
     fontSize: 15,
-    borderRadius: 6,
-    border: '1px solid #ccc',
+    borderRadius: radii.input,
+    border: `1px solid ${colors.inputBorder}`,
+    background: colors.inputBg,
+    color: colors.textPrimary,
     outline: 'none',
   },
   chatInput: {
-    borderColor: '#c7d2fe',
+    borderColor: colors.primary,
   },
   submitBtn: {
     padding: '10px 20px',
     fontSize: 15,
     fontWeight: 600,
-    borderRadius: 6,
+    borderRadius: radii.button,
     border: 'none',
-    background: '#4f46e5',
+    background: colors.primary,
     color: '#fff',
     cursor: 'pointer',
     whiteSpace: 'nowrap' as const,

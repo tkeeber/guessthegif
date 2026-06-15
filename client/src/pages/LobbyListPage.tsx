@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch } from '../lib/api';
+import { colors, radii, commonStyles } from '../styles/theme';
 
 interface LobbyWithHost {
   id: string;
@@ -10,6 +11,7 @@ interface LobbyWithHost {
   status: string;
   playerCount: number;
   created_at: string;
+  botsAllowed?: boolean;
 }
 
 interface ListLobbiesResponse {
@@ -38,6 +40,7 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [botsAllowed, setBotsAllowed] = useState(true);
 
   async function fetchLobbies() {
     try {
@@ -62,6 +65,7 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
       setError('');
       const data = await apiFetch<CreateLobbyResponse>('/api/lobbies', {
         method: 'POST',
+        body: JSON.stringify({ botsAllowed }),
       });
       onEnterLobby(data.lobby.id, data.lobby.join_code, '');
     } catch (err) {
@@ -105,25 +109,69 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
   return (
     <div style={styles.wrapper}>
       <div style={styles.container}>
-        <h1 style={styles.title}>🎬 Guess the Gif</h1>
-        <p style={styles.greeting}>
-          Welcome, <strong>{user?.email ?? 'Player'}</strong>
-        </p>
+        {/* Header */}
+        <div style={styles.header}>
+          <h1 style={styles.logo}>GUESS THE GIF</h1>
+          <p style={styles.greeting}>{user?.email ?? 'Player'}</p>
+        </div>
 
-        {/* Create / Join controls */}
-        <div style={styles.actions}>
+        {/* Stats row */}
+        <div style={styles.statsRow}>
+          <div style={styles.statCard}>
+            <span style={styles.statValue}>—</span>
+            <span style={styles.statLabel}>Rank</span>
+          </div>
+          <div style={styles.statCard}>
+            <span style={styles.statValue}>—</span>
+            <span style={styles.statLabel}>Points</span>
+          </div>
+        </div>
+
+        {/* Bots toggle + Action buttons */}
+        <div style={styles.botsToggleRow}>
+          <label style={styles.botsToggleLabel}>
+            <input
+              type="checkbox"
+              checked={botsAllowed}
+              onChange={(e) => setBotsAllowed(e.target.checked)}
+              style={styles.botsCheckbox}
+            />
+            <span>🤖 Allow Bots</span>
+          </label>
+        </div>
+
+        {/* Action buttons */}
+        <div style={styles.actionRow}>
           <button
             onClick={handleCreate}
             disabled={creating}
-            style={styles.primaryBtn}
+            style={{
+              ...styles.actionBtn,
+              opacity: creating ? 0.7 : 1,
+            }}
           >
             {creating ? 'Creating…' : 'Create Lobby'}
           </button>
+          <button
+            onClick={() => {/* handled by join code section */}}
+            disabled
+            style={{
+              ...styles.actionBtn,
+              opacity: 0.5,
+              cursor: 'default',
+            }}
+          >
+            Join Lobby
+          </button>
+        </div>
 
+        {/* Join with code */}
+        <div style={styles.joinSection}>
+          <span style={styles.joinLabel}>Join with Code</span>
           <div style={styles.joinRow}>
             <input
               type="text"
-              placeholder="Enter join code"
+              placeholder="ABCDEF"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value)}
               style={styles.input}
@@ -133,62 +181,70 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
             <button
               onClick={handleJoinByCode}
               disabled={joining || !joinCode.trim()}
-              style={styles.secondaryBtn}
+              style={{
+                ...styles.joinBtn,
+                opacity: joining || !joinCode.trim() ? 0.5 : 1,
+              }}
             >
-              {joining ? 'Joining…' : 'Join'}
+              {joining ? '…' : 'Join'}
             </button>
           </div>
         </div>
 
         {error && <p style={styles.error}>{error}</p>}
 
-        {/* Lobby list */}
-        <h2 style={styles.sectionTitle}>Available Lobbies</h2>
+        {/* Active lobbies */}
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>Active Lobbies</h2>
+            <button onClick={() => fetchLobbies()} style={styles.refreshBtn}>
+              ↻
+            </button>
+          </div>
 
-        {loading ? (
-          <p style={styles.muted}>Loading lobbies…</p>
-        ) : lobbies.length === 0 ? (
-          <p style={styles.muted}>No lobbies available. Create one!</p>
-        ) : (
-          <ul style={styles.list}>
-            {lobbies.map((lobby) => (
-              <li key={lobby.id} style={styles.listItem}>
-                <div>
-                  <strong>{lobby.hostUsername}</strong>'s lobby
-                  <span style={styles.badge}>
-                    {lobby.playerCount} player{lobby.playerCount !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleJoinLobby(lobby)}
-                  style={styles.joinBtn}
-                >
-                  Join
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+          {loading ? (
+            <p style={styles.muted}>Loading lobbies…</p>
+          ) : lobbies.length === 0 ? (
+            <p style={styles.muted}>No lobbies available. Create one!</p>
+          ) : (
+            <ul style={styles.list}>
+              {lobbies.map((lobby) => (
+                <li key={lobby.id} style={styles.lobbyCard}>
+                  <div style={styles.lobbyInfo}>
+                    <span style={styles.lobbyName}>{lobby.hostUsername}&apos;s lobby</span>
+                    <span style={styles.playerCount}>
+                      {lobby.playerCount} player{lobby.playerCount !== 1 ? 's' : ''}
+                      {lobby.botsAllowed && <span style={styles.botIndicator}> 🤖</span>}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleJoinLobby(lobby)}
+                    style={styles.lobbyJoinBtn}
+                  >
+                    Join
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-        <button onClick={() => fetchLobbies()} style={styles.refreshBtn}>
-          Refresh
-        </button>
-
-        <button onClick={signOut} style={styles.signOutBtn}>
-          Sign Out
-        </button>
-
-        {onOpenLeaderboard && (
-          <button onClick={onOpenLeaderboard} style={styles.leaderboardBtn}>
-            🏆 Leaderboard
+        {/* Bottom links */}
+        <div style={styles.bottomSection}>
+          {onOpenLeaderboard && (
+            <button onClick={onOpenLeaderboard} style={styles.bottomBtn}>
+              🏆 Leaderboard
+            </button>
+          )}
+          {onOpenAdmin && (
+            <button onClick={onOpenAdmin} style={styles.adminBtn}>
+              🔧 Admin
+            </button>
+          )}
+          <button onClick={signOut} style={styles.signOutBtn}>
+            Sign Out
           </button>
-        )}
-
-        {onOpenAdmin && (
-          <button onClick={onOpenAdmin} style={styles.adminBtn}>
-            🔧 Admin
-          </button>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -196,131 +252,248 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
 
 const styles: Record<string, React.CSSProperties> = {
   wrapper: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    minHeight: '100vh',
-    padding: 16,
-    fontFamily: 'system-ui, sans-serif',
+    ...commonStyles.pageWrapper,
   },
   container: {
-    width: '100%',
-    maxWidth: 480,
-    paddingTop: 32,
+    ...commonStyles.pageContainer,
   },
-  title: { textAlign: 'center', margin: '0 0 4px' },
-  greeting: { textAlign: 'center', fontSize: 14, margin: '0 0 20px', color: '#555' },
-  actions: {
+  header: {
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  logo: {
+    fontSize: 24,
+    fontWeight: 900,
+    letterSpacing: 2,
+    margin: 0,
+    background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  },
+  greeting: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    margin: '6px 0 0',
+  },
+  statsRow: {
+    display: 'flex',
+    gap: 12,
+    marginBottom: 20,
+  },
+  statCard: {
+    flex: 1,
     display: 'flex',
     flexDirection: 'column',
+    alignItems: 'center',
+    padding: '14px 12px',
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  actionRow: {
+    display: 'flex',
     gap: 12,
     marginBottom: 16,
   },
+  actionBtn: {
+    flex: 1,
+    padding: '14px 0',
+    fontSize: 15,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: 'none',
+    background: colors.primary,
+    color: '#ffffff',
+    cursor: 'pointer',
+  },
+  joinSection: {
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+    padding: 16,
+    marginBottom: 20,
+  },
+  joinLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: colors.textSecondary,
+    marginBottom: 10,
+    display: 'block',
+  },
   joinRow: {
     display: 'flex',
-    gap: 8,
+    gap: 10,
   },
   input: {
+    ...commonStyles.input,
     flex: 1,
-    padding: '10px 12px',
-    fontSize: 16,
-    borderRadius: 6,
-    border: '1px solid #ccc',
     textTransform: 'uppercase',
+    letterSpacing: 3,
+    fontWeight: 600,
   },
-  primaryBtn: {
-    padding: '12px 0',
-    fontSize: 16,
-    borderRadius: 6,
+  joinBtn: {
+    padding: '12px 20px',
+    fontSize: 15,
+    fontWeight: 600,
+    borderRadius: radii.button,
     border: 'none',
-    background: '#4f46e5',
-    color: '#fff',
+    background: colors.primary,
+    color: '#ffffff',
     cursor: 'pointer',
   },
-  secondaryBtn: {
-    padding: '10px 20px',
-    fontSize: 16,
-    borderRadius: 6,
-    border: '1px solid #4f46e5',
-    background: '#fff',
-    color: '#4f46e5',
-    cursor: 'pointer',
-  },
-  error: { color: '#d32f2f', fontSize: 14, textAlign: 'center', margin: '0 0 12px' },
-  sectionTitle: { fontSize: 18, margin: '0 0 8px' },
-  muted: { color: '#888', fontSize: 14 },
-  list: {
-    listStyle: 'none',
-    padding: 0,
+  error: {
+    color: colors.error,
+    fontSize: 14,
+    textAlign: 'center',
     margin: '0 0 12px',
   },
-  listItem: {
+  section: {
+    marginBottom: 20,
+  },
+  sectionHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '10px 12px',
-    borderRadius: 6,
-    border: '1px solid #e0e0e0',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  badge: {
-    marginLeft: 8,
-    fontSize: 12,
-    color: '#666',
-    background: '#f0f0f0',
-    padding: '2px 8px',
-    borderRadius: 10,
-  },
-  joinBtn: {
-    padding: '6px 16px',
-    fontSize: 14,
-    borderRadius: 6,
-    border: '1px solid #4f46e5',
-    background: '#fff',
-    color: '#4f46e5',
-    cursor: 'pointer',
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 700,
+    margin: 0,
+    color: colors.textPrimary,
   },
   refreshBtn: {
-    padding: '8px 0',
-    fontSize: 14,
-    borderRadius: 6,
-    border: '1px solid #ccc',
-    background: '#fff',
-    color: '#333',
+    background: 'none',
+    border: 'none',
+    color: colors.textSecondary,
+    fontSize: 20,
     cursor: 'pointer',
-    width: '100%',
-    marginBottom: 8,
+    padding: '4px 8px',
   },
-  signOutBtn: {
-    padding: '8px 0',
+  muted: {
+    color: colors.textMuted,
     fontSize: 14,
-    borderRadius: 6,
-    border: '1px solid #d32f2f',
-    background: '#fff',
-    color: '#d32f2f',
-    cursor: 'pointer',
-    width: '100%',
+    margin: 0,
   },
-  leaderboardBtn: {
-    padding: '8px 0',
+  list: {
+    listStyle: 'none',
+    padding: 0,
+    margin: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  lobbyCard: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '14px 16px',
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+  },
+  lobbyInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  lobbyName: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: colors.textPrimary,
+  },
+  playerCount: {
+    fontSize: 13,
+    color: colors.secondary,
+    fontWeight: 600,
+  },
+  lobbyJoinBtn: {
+    padding: '8px 18px',
     fontSize: 14,
-    borderRadius: 6,
-    border: '1px solid #4f46e5',
-    background: '#fff',
-    color: '#4f46e5',
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: `2px solid ${colors.primary}`,
+    background: 'transparent',
+    color: colors.primary,
+    cursor: 'pointer',
+  },
+  bottomSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+    marginTop: 12,
+    paddingTop: 16,
+    borderTop: `1px solid ${colors.surfaceBorder}`,
+  },
+  bottomBtn: {
+    padding: '12px 0',
+    fontSize: 15,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: `2px solid ${colors.primary}`,
+    background: 'transparent',
+    color: colors.primary,
     cursor: 'pointer',
     width: '100%',
-    marginTop: 8,
   },
   adminBtn: {
-    padding: '8px 0',
-    fontSize: 14,
-    borderRadius: 6,
-    border: '1px solid #d97706',
-    background: '#fff',
-    color: '#d97706',
+    padding: '12px 0',
+    fontSize: 15,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: `2px solid ${colors.secondary}`,
+    background: 'transparent',
+    color: colors.secondary,
     cursor: 'pointer',
     width: '100%',
-    marginTop: 8,
+  },
+  signOutBtn: {
+    padding: '10px 0',
+    fontSize: 14,
+    borderRadius: radii.button,
+    border: 'none',
+    background: 'transparent',
+    color: colors.textMuted,
+    cursor: 'pointer',
+    width: '100%',
+  },
+  botsToggleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: 12,
+    padding: '10px 14px',
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.button,
+  },
+  botsToggleLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14,
+    fontWeight: 500,
+    color: colors.textSecondary,
+    cursor: 'pointer',
+  },
+  botsCheckbox: {
+    width: 18,
+    height: 18,
+    cursor: 'pointer',
+    accentColor: colors.primary,
+  },
+  botIndicator: {
+    fontSize: 13,
   },
 };

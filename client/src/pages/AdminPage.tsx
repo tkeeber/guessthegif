@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '../lib/api';
+import { colors, radii, fonts } from '../styles/theme';
 
 // ---- Types matching server API responses ----
 
@@ -39,26 +40,26 @@ interface Gif {
 // ---- Styles ----
 
 const styles = {
-  page: { maxWidth: 960, margin: '0 auto', padding: 24, fontFamily: 'system-ui, sans-serif' } as const,
+  page: { maxWidth: 960, margin: '0 auto', padding: 24, fontFamily: fonts.base, background: colors.background, color: colors.textPrimary, minHeight: '100vh' } as const,
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 } as const,
-  section: { marginBottom: 32, padding: 16, border: '1px solid #e5e7eb', borderRadius: 8 } as const,
-  sectionTitle: { fontSize: 18, fontWeight: 600, marginBottom: 12 } as const,
+  section: { marginBottom: 32, padding: 16, border: `1px solid ${colors.surfaceBorder}`, borderRadius: radii.card, background: colors.surface } as const,
+  sectionTitle: { fontSize: 18, fontWeight: 600, marginBottom: 12, color: colors.textPrimary } as const,
   searchRow: { display: 'flex', gap: 8, marginBottom: 12 } as const,
-  input: { flex: 1, padding: '8px 12px', fontSize: 14, border: '1px solid #d1d5db', borderRadius: 6 } as const,
-  btn: { padding: '8px 16px', fontSize: 14, borderRadius: 6, border: 'none', cursor: 'pointer', background: '#4f46e5', color: '#fff' } as const,
-  btnDanger: { padding: '6px 12px', fontSize: 13, borderRadius: 6, border: 'none', cursor: 'pointer', background: '#dc2626', color: '#fff' } as const,
-  btnSecondary: { padding: '8px 16px', fontSize: 14, borderRadius: 6, border: '1px solid #4f46e5', cursor: 'pointer', background: '#fff', color: '#4f46e5' } as const,
+  input: { flex: 1, padding: '8px 12px', fontSize: 14, border: `1px solid ${colors.inputBorder}`, borderRadius: radii.input, background: colors.inputBg, color: colors.textPrimary, outline: 'none' } as const,
+  btn: { padding: '8px 16px', fontSize: 14, borderRadius: radii.button, border: 'none', cursor: 'pointer', background: colors.primary, color: '#fff' } as const,
+  btnDanger: { padding: '6px 12px', fontSize: 13, borderRadius: radii.button, border: 'none', cursor: 'pointer', background: colors.error, color: '#fff' } as const,
+  btnSecondary: { padding: '8px 16px', fontSize: 14, borderRadius: radii.button, border: `2px solid ${colors.primary}`, cursor: 'pointer', background: 'transparent', color: colors.primary } as const,
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 } as const,
-  card: { border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, cursor: 'pointer', textAlign: 'center' as const } as const,
-  cardSelected: { border: '2px solid #4f46e5', borderRadius: 8, padding: 8, cursor: 'pointer', textAlign: 'center' as const } as const,
+  card: { border: `1px solid ${colors.surfaceBorder}`, borderRadius: radii.card, padding: 8, cursor: 'pointer', textAlign: 'center' as const, background: colors.inputBg } as const,
+  cardSelected: { border: `2px solid ${colors.primary}`, borderRadius: radii.card, padding: 8, cursor: 'pointer', textAlign: 'center' as const, background: colors.inputBg } as const,
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 } as const,
-  label: { display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 } as const,
-  fieldInput: { width: '100%', padding: '6px 10px', fontSize: 14, border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' as const } as const,
-  error: { color: '#dc2626', fontSize: 13, marginTop: 4 } as const,
-  success: { color: '#16a34a', fontSize: 13, marginTop: 4 } as const,
+  label: { display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4, color: colors.textSecondary } as const,
+  fieldInput: { width: '100%', padding: '6px 10px', fontSize: 14, border: `1px solid ${colors.inputBorder}`, borderRadius: radii.input, boxSizing: 'border-box' as const, background: colors.inputBg, color: colors.textPrimary, outline: 'none' } as const,
+  error: { color: colors.error, fontSize: 13, marginTop: 4 } as const,
+  success: { color: colors.success, fontSize: 13, marginTop: 4 } as const,
   table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 14 } as const,
-  th: { textAlign: 'left' as const, padding: '8px 6px', borderBottom: '2px solid #e5e7eb', fontWeight: 600 } as const,
-  td: { padding: '8px 6px', borderBottom: '1px solid #f3f4f6' } as const,
+  th: { textAlign: 'left' as const, padding: '8px 6px', borderBottom: `2px solid ${colors.surfaceBorder}`, fontWeight: 600, color: colors.textSecondary } as const,
+  td: { padding: '8px 6px', borderBottom: `1px solid ${colors.surfaceBorder}`, color: colors.textPrimary } as const,
 };
 
 // ---- Component ----
@@ -253,7 +254,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <h1 style={{ margin: 0 }}>🎬 Admin — GIF Curation</h1>
+        <h1 style={{ margin: 0, color: colors.textPrimary }}>🎬 Admin — GIF Curation</h1>
         <button style={styles.btnSecondary} onClick={onBack}>← Back</button>
       </div>
 
@@ -284,8 +285,8 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                 onClick={() => handleSelectMovie(m)}
               >
                 {m.posterUrl && <img src={m.posterUrl} alt={m.title} style={{ width: '100%', borderRadius: 4 }} />}
-                <div style={{ fontSize: 13, fontWeight: 500, marginTop: 4 }}>{m.title}</div>
-                <div style={{ fontSize: 12, color: '#6b7280' }}>{m.releaseYear || '—'}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, marginTop: 4, color: colors.textPrimary }}>{m.title}</div>
+                <div style={{ fontSize: 12, color: colors.textMuted }}>{m.releaseYear || '—'}</div>
               </div>
             ))}
           </div>
@@ -318,7 +319,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                   onClick={() => setSelectedGif(g)}
                 >
                   <img src={g.previewUrl} alt={g.title} style={{ width: '100%', borderRadius: 4 }} />
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{g.title}</div>
+                  <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{g.title}</div>
                 </div>
               ))}
             </div>
@@ -349,7 +350,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
             </div>
           </div>
           <div style={{ marginBottom: 8 }}>
-            <strong style={{ fontSize: 13 }}>Selected GIF:</strong>{' '}
+            <strong style={{ fontSize: 13, color: colors.textPrimary }}>Selected GIF:</strong>{' '}
             <img src={selectedGif.previewUrl} alt="" style={{ height: 60, verticalAlign: 'middle', borderRadius: 4, marginLeft: 8 }} />
           </div>
           <button style={styles.btn} onClick={handleSave} disabled={saving}>
@@ -364,9 +365,9 @@ export default function AdminPage({ onBack }: AdminPageProps) {
       <div style={styles.section}>
         <div style={styles.sectionTitle}>GIF Library</div>
         {libraryLoading ? (
-          <p>Loading…</p>
+          <p style={{ color: colors.textSecondary }}>Loading…</p>
         ) : library.length === 0 ? (
-          <p style={{ color: '#6b7280' }}>No GIFs in library yet.</p>
+          <p style={{ color: colors.textMuted }}>No GIFs in library yet.</p>
         ) : (
           <table style={styles.table}>
             <thead>

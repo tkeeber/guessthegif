@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { colors, radii, fonts, commonStyles } from '../styles/theme';
 
 interface SignupPageProps {
   onNavigateLogin: () => void;
@@ -51,58 +52,76 @@ export default function SignupPage({ onNavigateLogin }: SignupPageProps) {
 
   return (
     <div style={styles.wrapper}>
-      <form onSubmit={handleSubmit} style={styles.form} noValidate>
-        <h1 style={styles.title}>Create Account</h1>
+      <div style={styles.inner}>
+        {/* Logo */}
+        <div style={styles.logoSection}>
+          <h1 style={styles.logo}>GUESS THE GIF</h1>
+        </div>
 
-        <label style={styles.label}>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
-            autoComplete="email"
-          />
-          {errors.email && <span style={styles.error}>{errors.email}</span>}
-        </label>
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={styles.form} noValidate>
+          <h2 style={styles.formTitle}>Create Account</h2>
 
-        <label style={styles.label}>
-          Username
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            style={styles.input}
-            autoComplete="username"
-          />
-          {errors.username && <span style={styles.error}>{errors.username}</span>}
-        </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Email</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={styles.input}
+              autoComplete="email"
+              placeholder="you@example.com"
+            />
+            {errors.email && <span style={styles.error}>{errors.email}</span>}
+          </label>
 
-        <label style={styles.label}>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
-            autoComplete="new-password"
-          />
-          {errors.password && <span style={styles.error}>{errors.password}</span>}
-        </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Username</span>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              style={styles.input}
+              autoComplete="username"
+              placeholder="coolplayer99"
+            />
+            {errors.username && <span style={styles.error}>{errors.username}</span>}
+          </label>
 
-        {errors.form && <p style={styles.formError}>{errors.form}</p>}
+          <label style={styles.label}>
+            <span style={styles.labelText}>Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={styles.input}
+              autoComplete="new-password"
+              placeholder="••••••••"
+            />
+            {errors.password && <span style={styles.error}>{errors.password}</span>}
+          </label>
 
-        <button type="submit" disabled={submitting} style={styles.button}>
-          {submitting ? 'Creating account…' : 'Sign Up'}
-        </button>
+          {errors.form && <p style={styles.formError}>{errors.form}</p>}
 
-        <p style={styles.link}>
-          Already have an account?{' '}
-          <button type="button" onClick={onNavigateLogin} style={styles.linkBtn}>
-            Sign in
+          <button
+            type="submit"
+            disabled={submitting}
+            style={{
+              ...styles.submitBtn,
+              opacity: submitting ? 0.7 : 1,
+            }}
+          >
+            {submitting ? 'Creating account…' : 'Sign Up'}
           </button>
-        </p>
-      </form>
+
+          <p style={styles.switchText}>
+            Already have an account?{' '}
+            <button type="button" onClick={onNavigateLogin} style={styles.linkBtn}>
+              Sign in
+            </button>
+          </p>
+        </form>
+      </div>
     </div>
   );
 }
@@ -114,42 +133,79 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     minHeight: '100vh',
     padding: 16,
-    fontFamily: 'system-ui, sans-serif',
+    fontFamily: fonts.base,
+    background: colors.background,
+    color: colors.textPrimary,
+  },
+  inner: {
+    width: '100%',
+    maxWidth: 400,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 32,
+  },
+  logoSection: {
+    textAlign: 'center',
+  },
+  logo: {
+    fontSize: 28,
+    fontWeight: 900,
+    letterSpacing: 2,
+    margin: 0,
+    background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
   },
   form: {
     width: '100%',
-    maxWidth: 380,
     display: 'flex',
     flexDirection: 'column',
-    gap: 16,
+    gap: 18,
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+    padding: 24,
   },
-  title: { textAlign: 'center' as const, margin: 0 },
-  label: { display: 'flex', flexDirection: 'column' as const, gap: 4, fontSize: 14 },
-  input: {
-    padding: '10px 12px',
-    fontSize: 16,
-    borderRadius: 6,
-    border: '1px solid #ccc',
+  formTitle: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 700,
+    textAlign: 'center',
+    color: colors.textPrimary,
   },
-  error: { color: '#d32f2f', fontSize: 12 },
-  formError: { color: '#d32f2f', fontSize: 14, textAlign: 'center' as const, margin: 0 },
-  button: {
-    padding: '12px 0',
-    fontSize: 16,
-    borderRadius: 6,
-    border: 'none',
-    background: '#4f46e5',
-    color: '#fff',
-    cursor: 'pointer',
+  label: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
   },
-  link: { textAlign: 'center' as const, fontSize: 14 },
-  linkBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#4f46e5',
-    cursor: 'pointer',
-    textDecoration: 'underline',
+  labelText: {
     fontSize: 14,
-    padding: 0,
+    fontWeight: 500,
+    color: colors.textSecondary,
+  },
+  input: {
+    ...commonStyles.input,
+  },
+  error: {
+    ...commonStyles.errorText,
+    fontSize: 12,
+  },
+  formError: {
+    ...commonStyles.errorText,
+    textAlign: 'center',
+  },
+  submitBtn: {
+    ...commonStyles.primaryButton,
+    marginTop: 4,
+  },
+  switchText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: colors.textSecondary,
+    margin: 0,
+  },
+  linkBtn: {
+    ...commonStyles.linkButton,
   },
 };

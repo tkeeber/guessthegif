@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '../lib/api';
 import { io as ioClient, Socket } from 'socket.io-client';
 import { supabase } from '../lib/supabase';
+import { colors, radii, commonStyles } from '../styles/theme';
 
 // ---------------------------------------------------------------------------
 // Types (mirroring server API responses)
@@ -182,15 +183,27 @@ export default function LeaderboardPage({ onBack }: LeaderboardPageProps) {
   const entries = isViewingCurrent ? currentEntries : archivedEntries;
   const displayLoading = isViewingCurrent ? loading : loadingArchived;
 
+  // Split top 3 and remaining
+  const top3 = entries.slice(0, 3);
+  const rest = entries.slice(3);
+
+  // Find current user stats
+  const myEntry = entries.find((e) => e.username === currentUsername);
+
   return (
     <div style={styles.wrapper}>
       <div style={styles.container}>
         {/* Header */}
         <div style={styles.header}>
           <button onClick={onBack} style={styles.backBtn} aria-label="Back to lobbies">
-            ← Back
+            ←
           </button>
           <h1 style={styles.title}>🏆 Leaderboard</h1>
+        </div>
+
+        {/* Tab selector */}
+        <div style={styles.tabRow}>
+          <button style={styles.tabActive}>Global</button>
         </div>
 
         {/* Season selector */}
@@ -229,39 +242,91 @@ export default function LeaderboardPage({ onBack }: LeaderboardPageProps) {
 
         {error && <p style={styles.error}>{error}</p>}
 
-        {/* Table */}
+        {/* Content */}
         {displayLoading ? (
           <p style={styles.muted}>Loading…</p>
         ) : entries.length === 0 ? (
           <p style={styles.muted}>No scores yet.</p>
         ) : (
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>#</th>
-                <th style={{ ...styles.th, textAlign: 'left' }}>Player</th>
-                <th style={styles.th}>Correct</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry) => {
-                const isMe = entry.username === currentUsername;
+          <>
+            {/* Top 3 Podium */}
+            <div style={styles.podium}>
+              {top3.map((entry, idx) => {
+                const podiumColors = [colors.secondary, colors.textSecondary, '#cd7f32'];
+                const sizes = [64, 52, 48];
                 return (
-                  <tr
-                    key={entry.username + entry.rank}
-                    style={isMe ? styles.highlightRow : styles.row}
-                  >
-                    <td style={styles.td}>{entry.rank}</td>
-                    <td style={{ ...styles.td, textAlign: 'left', fontWeight: isMe ? 700 : 400 }}>
+                  <div key={entry.username + entry.rank} style={styles.podiumItem}>
+                    <div style={{
+                      ...styles.podiumAvatar,
+                      width: sizes[idx],
+                      height: sizes[idx],
+                      border: `3px solid ${podiumColors[idx]}`,
+                    }}>
+                      <span style={styles.podiumRank}>{entry.rank}</span>
+                    </div>
+                    <span style={{
+                      ...styles.podiumName,
+                      fontWeight: entry.username === currentUsername ? 700 : 500,
+                    }}>
                       {entry.username}
-                      {isMe && <span style={styles.youBadge}> (you)</span>}
-                    </td>
-                    <td style={styles.td}>{entry.correctGuessCount}</td>
-                  </tr>
+                    </span>
+                    <span style={styles.podiumPoints}>
+                      {entry.correctGuessCount} pts
+                    </span>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Remaining players */}
+            {rest.length > 0 && (
+              <ul style={styles.list}>
+                {rest.map((entry) => {
+                  const isMe = entry.username === currentUsername;
+                  return (
+                    <li
+                      key={entry.username + entry.rank}
+                      style={{
+                        ...styles.listItem,
+                        background: isMe ? '#1e1e4a' : colors.surface,
+                      }}
+                    >
+                      <div style={styles.rankCircle}>
+                        <span style={styles.rankNum}>{entry.rank}</span>
+                      </div>
+                      <span style={{
+                        ...styles.listName,
+                        fontWeight: isMe ? 700 : 400,
+                      }}>
+                        {entry.username}
+                        {isMe && <span style={styles.youBadge}> (you)</span>}
+                      </span>
+                      <span style={styles.listPoints}>
+                        {entry.correctGuessCount}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        )}
+
+        {/* Your Stats */}
+        {myEntry && (
+          <div style={styles.statsCard}>
+            <h3 style={styles.statsTitle}>Your Stats</h3>
+            <div style={styles.statsGrid}>
+              <div style={styles.statsItem}>
+                <span style={styles.statsValue}>{myEntry.rank}</span>
+                <span style={styles.statsLabel}>Rank</span>
+              </div>
+              <div style={styles.statsItem}>
+                <span style={styles.statsValue}>{myEntry.correctGuessCount}</span>
+                <span style={styles.statsLabel}>Points</span>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -274,17 +339,10 @@ export default function LeaderboardPage({ onBack }: LeaderboardPageProps) {
 
 const styles: Record<string, React.CSSProperties> = {
   wrapper: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    minHeight: '100vh',
-    padding: 16,
-    fontFamily: 'system-ui, sans-serif',
+    ...commonStyles.pageWrapper,
   },
   container: {
-    width: '100%',
-    maxWidth: 480,
-    paddingTop: 24,
+    ...commonStyles.pageContainer,
   },
   header: {
     display: 'flex',
@@ -293,74 +351,191 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 16,
   },
   backBtn: {
-    padding: '6px 12px',
-    fontSize: 14,
-    borderRadius: 6,
-    border: '1px solid #ccc',
-    background: '#fff',
+    padding: '8px 12px',
+    fontSize: 16,
+    borderRadius: radii.button,
+    border: `1px solid ${colors.surfaceBorder}`,
+    background: colors.surface,
+    color: colors.textPrimary,
     cursor: 'pointer',
   },
   title: {
     margin: 0,
     fontSize: 22,
+    fontWeight: 700,
+    color: colors.textPrimary,
+  },
+  tabRow: {
+    display: 'flex',
+    gap: 0,
+    marginBottom: 16,
+  },
+  tabActive: {
+    padding: '10px 24px',
+    fontSize: 14,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: 'none',
+    background: colors.primary,
+    color: '#ffffff',
+    cursor: 'pointer',
   },
   seasonRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
     fontWeight: 600,
+    color: colors.textSecondary,
   },
   select: {
     flex: 1,
-    padding: '8px 10px',
+    padding: '10px 12px',
     fontSize: 14,
-    borderRadius: 6,
-    border: '1px solid #ccc',
+    borderRadius: radii.button,
+    border: `1px solid ${colors.inputBorder}`,
+    background: colors.inputBg,
+    color: colors.textPrimary,
   },
   archiveInfo: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textMuted,
     margin: '0 0 12px',
   },
   error: {
-    color: '#d32f2f',
+    color: colors.error,
     fontSize: 14,
     margin: '0 0 12px',
   },
   muted: {
-    color: '#888',
+    color: colors.textMuted,
     fontSize: 14,
   },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
+  // Podium
+  podium: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    gap: 20,
+    marginBottom: 24,
+    padding: '24px 0 16px',
   },
-  th: {
-    padding: '8px 12px',
+  podiumItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 8,
+  },
+  podiumAvatar: {
+    borderRadius: '50%',
+    background: colors.surface,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  podiumRank: {
+    fontSize: 20,
+    fontWeight: 800,
+    color: colors.textPrimary,
+  },
+  podiumName: {
     fontSize: 13,
+    color: colors.textPrimary,
     textAlign: 'center',
-    borderBottom: '2px solid #e0e0e0',
-    color: '#555',
+    maxWidth: 80,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
-  row: {
-    borderBottom: '1px solid #f0f0f0',
+  podiumPoints: {
+    fontSize: 12,
+    color: colors.secondary,
+    fontWeight: 600,
   },
-  highlightRow: {
-    borderBottom: '1px solid #f0f0f0',
-    background: '#eef2ff',
+  // List
+  list: {
+    listStyle: 'none',
+    padding: 0,
+    margin: '0 0 20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
   },
-  td: {
-    padding: '10px 12px',
+  listItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '12px 16px',
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.button,
+  },
+  rankCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: '50%',
+    background: colors.surfaceBorder,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankNum: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: colors.textSecondary,
+  },
+  listName: {
+    flex: 1,
     fontSize: 15,
-    textAlign: 'center',
+    color: colors.textPrimary,
+  },
+  listPoints: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: colors.secondary,
   },
   youBadge: {
     fontSize: 12,
-    color: '#4f46e5',
+    color: colors.primary,
     fontWeight: 400,
+  },
+  // Stats card
+  statsCard: {
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+    padding: 20,
+    marginTop: 8,
+  },
+  statsTitle: {
+    margin: '0 0 14px',
+    fontSize: 16,
+    fontWeight: 700,
+    color: colors.textPrimary,
+  },
+  statsGrid: {
+    display: 'flex',
+    gap: 16,
+  },
+  statsItem: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statsValue: {
+    fontSize: 24,
+    fontWeight: 700,
+    color: colors.textPrimary,
+  },
+  statsLabel: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 };

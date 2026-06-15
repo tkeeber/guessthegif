@@ -45,13 +45,14 @@ export async function checkForSeasonWinner(
     return null;
   }
 
-  // Check if any player has reached the win threshold
+  // Check if any human player has reached the win threshold (bots excluded)
   const winnerResult = await pool.query(
     `SELECT ss.player_id, p.username, ss.correct_guess_count
        FROM season_scores ss
        JOIN players p ON p.id = ss.player_id
       WHERE ss.season_id = $1
         AND ss.correct_guess_count >= $2
+        AND p.is_bot = false
       ORDER BY ss.last_correct_at ASC
       LIMIT 1`,
     [seasonId, SEASON_WIN_THRESHOLD]

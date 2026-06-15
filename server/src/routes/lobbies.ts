@@ -8,6 +8,7 @@ import {
   LobbyWithHost,
 } from '../types';
 import { LobbyStatus } from '../types';
+import { botManager } from '../services/botManager';
 
 const router = Router();
 
@@ -43,6 +44,8 @@ async function generateUniqueJoinCode(): Promise<string> {
 // List available lobbies with status='waiting', include host username and player count
 router.get('/', requireAuth, async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+
+
     const result = await pool.query(
       `SELECT
         l.id,
@@ -50,6 +53,7 @@ router.get('/', requireAuth, async (_req: AuthenticatedRequest, res: Response): 
         l.host_id,
         p.username AS host_username,
         l.status,
+        l.bots_allowed,
         l.created_at,
         COUNT(lp.player_id)::int AS player_count
       FROM lobbies l
@@ -68,6 +72,7 @@ router.get('/', requireAuth, async (_req: AuthenticatedRequest, res: Response): 
       hostUsername: row.host_username,
       status: row.status,
       playerCount: row.player_count,
+      botsAllowed: row.bots_allowed,
       created_at: row.created_at,
     }));
 
@@ -103,16 +108,19 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
 
     const joinCode = await generateUniqueJoinCode();
 
+    // Accept optional botsAllowed param (defaults to true)
+    const botsAllowed = req.body.botsAllowed !== false;
+
     // Create lobby and add host as first player in a transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
       const lobbyResult = await client.query(
-        `INSERT INTO lobbies (join_code, host_id, status)
-         VALUES ($1, $2, $3)
+        `INSERT INTO lobbies (join_code, host_id, status, bots_allowed)
+         VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [joinCode, playerId, LobbyStatus.Waiting]
+        [joinCode, playerId, LobbyStatus.Waiting, botsAllowed]
       );
 
       const lobby = lobbyResult.rows[0];
@@ -213,6 +221,79 @@ router.post('/:code/join', requireAuth, async (req: AuthenticatedRequest, res: R
     res.status(200).json(response);
   } catch (error) {
     console.error('Join lobby error:', error);
+    res.status(500).json({ error: 'server_error', message: 'Internal server error' });
+  }
+});
+
+// PATCH /api/lobbies/:id/bots-allowed
+// Toggle bots_allowed setting. Only the host can toggle, only when lobby is waiting.
+router.patch('/:id/bots-allowed', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'unauthorized', message: 'Not authenticated' });
+      return;
+    }
+
+    const { id } = req.params;
+    const { botsAllowed } = req.body;
+
+    if (typeof botsAllowed !== 'boolean') {
+      res.status(400).json({ error: 'bad_request', message: 'botsAllowed must be a boolean' });
+      return;
+    }
+
+    // Look up the player record
+    const playerResult = await pool.query(
+      'SELECT id FROM players WHERE supabase_user_id = $1',
+      [req.user.id]
+    );
+
+    if (playerResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found', message: 'Player profile not found' });
+      return;
+    }
+
+    const playerId = playerResult.rows[0].id;
+
+    // Fetch the lobby
+    const lobbyResult = await pool.query(
+      'SELECT * FROM lobbies WHERE id = $1',
+      [id]
+    );
+
+    if (lobbyResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found', message: 'Lobby not found' });
+      return;
+    }
+
+    const lobby = lobbyResult.rows[0];
+
+    // Only the host can toggle
+    if (lobby.host_id !== playerId) {
+      res.status(403).json({ error: 'forbidden', message: 'Only the host can change bot settings' });
+      return;
+    }
+
+    // Only when lobby is waiting
+    if (lobby.status !== 'waiting') {
+      res.status(409).json({ error: 'conflict', message: 'Can only change bot settings while lobby is waiting' });
+      return;
+    }
+
+    // Update the setting
+    await pool.query(
+      'UPDATE lobbies SET bots_allowed = $1 WHERE id = $2',
+      [botsAllowed, id]
+    );
+
+    // If toggling from true to false, remove bots from the lobby
+    if (!botsAllowed && lobby.bots_allowed === true) {
+      await botManager.removeBotsFromLobby(id);
+    }
+
+    res.status(200).json({ success: true, botsAllowed });
+  } catch (error) {
+    console.error('Toggle bots-allowed error:', error);
     res.status(500).json({ error: 'server_error', message: 'Internal server error' });
   }
 });

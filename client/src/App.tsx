@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { apiFetch } from './lib/api';
+import { colors, fonts } from './styles/theme';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import LobbyListPage from './pages/LobbyListPage';
@@ -60,8 +61,8 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <p>Loading…</p>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: colors.background, fontFamily: fonts.base }}>
+        <p style={{ color: colors.textPrimary }}>Loading…</p>
       </div>
     );
   }

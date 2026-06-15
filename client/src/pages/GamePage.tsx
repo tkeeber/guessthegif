@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import type { Socket } from 'socket.io-client';
 import { createSocket } from '../lib/socket';
 import GuessFeed, { FeedEntry } from '../components/GuessFeed';
+import { colors, radii, fonts, commonStyles } from '../styles/theme';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -347,8 +348,8 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
     return (
       <div style={styles.overlay}>
         <div style={styles.overlayBox}>
-          <h2 style={{ margin: '0 0 8px' }}>Reconnecting…</h2>
-          <p style={{ color: '#666', margin: 0 }}>
+          <h2 style={{ margin: '0 0 8px', color: colors.textPrimary }}>Reconnecting…</h2>
+          <p style={{ color: colors.textSecondary, margin: 0 }}>
             Trying to restore your connection. Please wait.
           </p>
         </div>
@@ -364,8 +365,8 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.center}>
-          <h2>Disconnected</h2>
-          <p style={{ color: '#666' }}>
+          <h2 style={{ color: colors.textPrimary }}>Disconnected</h2>
+          <p style={{ color: colors.textSecondary }}>
             Could not reconnect to the game server.
           </p>
           <button onClick={onBack} style={styles.primaryBtn}>
@@ -384,8 +385,8 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.center}>
-          <h2>🎬 Guess the GIF</h2>
-          <p style={{ color: '#666' }}>
+          <h2 style={{ color: colors.textPrimary }}>🎬 Guess the GIF</h2>
+          <p style={{ color: colors.textSecondary }}>
             {phase === 'connecting'
               ? 'Connecting to game…'
               : betweenRoundCountdown > 0
@@ -405,7 +406,7 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.container}>
-          <h2 style={{ textAlign: 'center' }}>🏁 Session Complete</h2>
+          <h2 style={{ textAlign: 'center', color: colors.textPrimary }}>🏁 Session Complete</h2>
 
           {seasonWinner && (
             <div style={styles.seasonBanner}>
@@ -433,7 +434,7 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
           </table>
 
           {sessionSummary && (
-            <p style={{ color: '#666', fontSize: 14, textAlign: 'center' }}>
+            <p style={{ color: colors.textSecondary, fontSize: 14, textAlign: 'center' }}>
               {sessionSummary}
             </p>
           )}
@@ -465,7 +466,7 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
             <span
               style={{
                 ...styles.timerLabel,
-                color: timer <= 10 ? '#dc2626' : '#333',
+                color: timer <= 10 ? colors.error : colors.textPrimary,
               }}
             >
               ⏱ {formatTimer(timer)}
@@ -545,7 +546,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'flex-start',
     minHeight: '100vh',
     padding: 12,
-    fontFamily: 'system-ui, sans-serif',
+    fontFamily: fonts.base,
+    background: colors.background,
+    color: colors.textPrimary,
   },
   container: {
     width: '100%',
@@ -567,7 +570,7 @@ const styles: Record<string, React.CSSProperties> = {
   roundLabel: {
     fontSize: 18,
     fontWeight: 700,
-    color: '#4f46e5',
+    color: colors.primary,
   },
   timerLabel: {
     fontSize: 20,
@@ -575,18 +578,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontVariantNumeric: 'tabular-nums',
   },
   notification: {
-    background: '#fef3c7',
-    color: '#92400e',
+    background: 'rgba(245, 158, 11, 0.15)',
+    color: colors.secondary,
     padding: '6px 12px',
-    borderRadius: 6,
+    borderRadius: radii.input,
     fontSize: 13,
     textAlign: 'center' as const,
+    border: `1px solid ${colors.secondary}`,
   },
   gifContainer: {
     width: '100%',
-    borderRadius: 10,
+    borderRadius: radii.card,
     overflow: 'hidden',
-    background: '#000',
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -599,27 +604,29 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'block',
   },
   gifPlaceholder: {
-    color: '#999',
+    color: colors.textMuted,
     padding: 40,
   },
   clueBox: {
-    background: '#fffbeb',
-    border: '1px solid #fbbf24',
-    borderRadius: 8,
+    background: 'rgba(245, 158, 11, 0.1)',
+    border: `1px solid ${colors.secondary}`,
+    borderRadius: radii.input,
     padding: '10px 14px',
     fontSize: 15,
+    color: colors.textPrimary,
   },
   clueLabel: {
     fontWeight: 700,
-    color: '#b45309',
+    color: colors.secondary,
   },
   resultBox: {
-    background: '#f0fdf4',
-    border: '1px solid #86efac',
-    borderRadius: 10,
+    background: colors.surface,
+    border: `1px solid ${colors.success}`,
+    borderRadius: radii.card,
     padding: '16px',
     textAlign: 'center' as const,
     fontSize: 16,
+    color: colors.textPrimary,
   },
   resultIcon: {
     fontSize: 28,
@@ -629,53 +636,47 @@ const styles: Record<string, React.CSSProperties> = {
   filmReveal: {
     fontSize: 20,
     fontWeight: 700,
-    color: '#4f46e5',
+    color: colors.primary,
     marginTop: 6,
   },
   nextRound: {
     marginTop: 8,
     fontSize: 14,
-    color: '#666',
+    color: colors.textMuted,
   },
   primaryBtn: {
+    ...commonStyles.primaryButton,
     display: 'block',
-    width: '100%',
-    padding: '14px 0',
-    fontSize: 16,
-    fontWeight: 600,
-    borderRadius: 6,
-    border: 'none',
-    background: '#4f46e5',
-    color: '#fff',
-    cursor: 'pointer',
     marginTop: 12,
   },
   overlay: {
     position: 'fixed' as const,
     inset: 0,
-    background: 'rgba(0,0,0,0.5)',
+    background: 'rgba(15, 15, 35, 0.85)',
+    backdropFilter: 'blur(6px)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
-    fontFamily: 'system-ui, sans-serif',
+    fontFamily: fonts.base,
   },
   overlayBox: {
-    background: '#fff',
-    borderRadius: 12,
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
     padding: '32px 40px',
     textAlign: 'center' as const,
-    boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
   },
   seasonBanner: {
-    background: '#fef3c7',
-    border: '1px solid #fbbf24',
-    borderRadius: 8,
+    background: 'rgba(245, 158, 11, 0.15)',
+    border: `1px solid ${colors.secondary}`,
+    borderRadius: radii.input,
     padding: '12px',
     textAlign: 'center' as const,
     fontSize: 18,
     fontWeight: 700,
-    color: '#92400e',
+    color: colors.secondary,
   },
   scoreTable: {
     width: '100%',
@@ -684,14 +685,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
   th: {
     padding: '8px 12px',
-    borderBottom: '2px solid #e0e0e0',
+    borderBottom: `2px solid ${colors.surfaceBorder}`,
     textAlign: 'left' as const,
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
   },
   td: {
     padding: '10px 12px',
-    borderBottom: '1px solid #f0f0f0',
+    borderBottom: `1px solid ${colors.surfaceBorder}`,
     fontSize: 15,
+    color: colors.textPrimary,
   },
 };

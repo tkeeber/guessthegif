@@ -77,6 +77,7 @@ const disconnectTimers = new Map<string, NodeJS.Timeout>();
  * Broadcast the current player list for a lobby to all connected sockets in that room.
  */
 async function broadcastLobbyUpdate(io: TypedServer, lobbyId: string): Promise<void> {
+
   const result = await pool.query(
     `SELECT p.id AS player_id, p.username,
             CASE WHEN l.host_id = p.id THEN true ELSE false END AS is_host
@@ -123,9 +124,64 @@ export function initSocketServer(httpServer: HttpServer): TypedServer {
     },
   });
 
-  // Supabase JWT authentication middleware
+  // Supabase JWT authentication middleware (with dev bypass)
   io.use(async (socket, next) => {
     try {
+      // --- Dev bypass: skip JWT validation in development mode ---
+      if (
+        process.env.NODE_ENV === 'development' &&
+        socket.handshake.auth?.devBypass === true &&
+        socket.handshake.auth?.playerId
+      ) {
+        const playerId = socket.handshake.auth.playerId as string;
+
+        // Verify the player exists in the database
+        const playerResult = await pool.query(
+          'SELECT id, supabase_user_id, email FROM players WHERE id = $1',
+          [playerId]
+        );
+
+        if (playerResult.rows.length === 0) {
+          return next(new Error('not_authenticated'));
+        }
+
+        socket.data = {
+          playerId: playerResult.rows[0].id,
+          supabaseUserId: playerResult.rows[0].supabase_user_id,
+          email: playerResult.rows[0].email || '',
+        };
+
+        return next();
+      }
+
+      // --- Bot internal auth: production-safe bot bypass ---
+      if (
+        process.env.BOT_INTERNAL_SECRET &&
+        socket.handshake.auth?.botSecret === process.env.BOT_INTERNAL_SECRET &&
+        socket.handshake.auth?.botPlayerId
+      ) {
+        const botPlayerId = socket.handshake.auth.botPlayerId as string;
+
+        // Verify this is actually a bot player
+        const playerResult = await pool.query(
+          'SELECT id, supabase_user_id, email FROM players WHERE id = $1 AND is_bot = true',
+          [botPlayerId]
+        );
+
+        if (playerResult.rows.length === 0) {
+          return next(new Error('not_authenticated'));
+        }
+
+        socket.data = {
+          playerId: playerResult.rows[0].id,
+          supabaseUserId: playerResult.rows[0].supabase_user_id,
+          email: playerResult.rows[0].email || '',
+        };
+
+        return next();
+      }
+
+      // --- Normal JWT auth flow ---
       const token = socket.handshake.auth?.token as string | undefined;
 
       if (!token) {

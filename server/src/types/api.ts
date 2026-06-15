@@ -39,6 +39,7 @@ export interface LobbyWithHost {
   hostUsername: string;
   status: LobbyStatus;
   playerCount: number;
+  botsAllowed?: boolean;
   created_at: string;
 }
 

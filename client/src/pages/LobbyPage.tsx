@@ -1,6 +1,14 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { createSocket } from '../lib/socket';
+import { apiFetch } from '../lib/api';
+import { colors, radii, commonStyles } from '../styles/theme';
 import type { Socket } from 'socket.io-client';
+
+const BOT_PREFIXES = ['NoviceBot_', 'IntermediateBot_', 'ExpertBot_'];
+
+function isBot(username: string): boolean {
+  return BOT_PREFIXES.some((prefix) => username.startsWith(prefix));
+}
 
 interface LobbyPlayer {
   playerId: string;
@@ -30,6 +38,9 @@ export default function LobbyPage({
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [isHost, setIsHost] = useState(!hostId);
+  const [copied, setCopied] = useState(false);
+  const [botsAllowed, setBotsAllowed] = useState(true);
+  const [togglingBots, setTogglingBots] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
   const connectSocket = useCallback(async () => {
@@ -63,7 +74,7 @@ export default function LobbyPage({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect');
     }
-  }, [lobbyId, onGameStart]);
+  }, [lobbyId, onGameStart, currentUserId]);
 
   useEffect(() => {
     connectSocket();
@@ -87,46 +98,114 @@ export default function LobbyPage({
     });
   }
 
+  function handleCopyCode() {
+    navigator.clipboard.writeText(joinCode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      // Fallback: do nothing
+    });
+  }
+
+  async function handleToggleBots() {
+    const newValue = !botsAllowed;
+    setBotsAllowed(newValue);
+    setTogglingBots(true);
+    try {
+      await apiFetch(`/api/lobbies/${lobbyId}/bots-allowed`, {
+        method: 'PATCH',
+        body: JSON.stringify({ botsAllowed: newValue }),
+      });
+    } catch (err) {
+      // Revert on failure
+      setBotsAllowed(!newValue);
+      setError(err instanceof Error ? err.message : 'Failed to toggle bots');
+    } finally {
+      setTogglingBots(false);
+    }
+  }
+
   const canStart = isHost && players.length >= 2 && !starting;
 
   return (
     <div style={styles.wrapper}>
       <div style={styles.container}>
+        {/* Back button */}
         <button onClick={onBack} style={styles.backBtn}>
           ← Back to lobbies
         </button>
 
-        <h1 style={styles.title}>Lobby</h1>
-
-        <div style={styles.codeBox}>
-          <span style={styles.codeLabel}>Join Code</span>
-          <span style={styles.code}>{joinCode}</span>
+        {/* Lobby header */}
+        <div style={styles.headerCard}>
+          <h1 style={styles.title}>Lobby</h1>
+          <div style={styles.codeRow}>
+            <span style={styles.codeLabel}>Join Code</span>
+            <span style={styles.code}>{joinCode}</span>
+          </div>
+          <button onClick={handleCopyCode} style={styles.copyBtn}>
+            {copied ? '✓ Copied!' : 'Copy Code'}
+          </button>
         </div>
 
+        {/* Connection status */}
         <p style={styles.status}>
-          {connected ? '🟢 Connected' : '🔴 Connecting…'}
+          <span style={{
+            display: 'inline-block',
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: connected ? colors.success : colors.error,
+            marginRight: 8,
+          }} />
+          {connected ? 'Connected' : 'Connecting…'}
         </p>
 
         {error && <p style={styles.error}>{error}</p>}
 
-        <h2 style={styles.sectionTitle}>
-          Players ({players.length})
-        </h2>
+        {/* Players list */}
+        <div style={styles.playersSection}>
+          <h2 style={styles.sectionTitle}>
+            Players ({players.length})
+          </h2>
 
-        {players.length === 0 ? (
-          <p style={styles.muted}>Waiting for players…</p>
-        ) : (
-          <ul style={styles.list}>
-            {players.map((p) => (
-              <li key={p.playerId} style={styles.listItem}>
-                {p.username}
-              </li>
-            ))}
-          </ul>
+          {players.length === 0 ? (
+            <p style={styles.muted}>Waiting for players…</p>
+          ) : (
+            <ul style={styles.list}>
+              {players.map((p, idx) => (
+                <li key={p.playerId} style={styles.playerItem}>
+                  <div style={styles.playerLeft}>
+                    <span style={styles.onlineDot} />
+                    <span style={styles.playerName}>
+                      {p.username}
+                      {isBot(p.username) && <span style={styles.botBadge}> 🤖</span>}
+                    </span>
+                  </div>
+                  {idx === 0 && <span style={styles.hostBadge}>👑</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Host controls */}
+        {isHost && players.length < 2 && (
+          <p style={styles.waitingText}>Need at least 2 players to start.</p>
         )}
 
-        {isHost && players.length < 2 && (
-          <p style={styles.muted}>Need at least 2 players to start.</p>
+        {isHost && (
+          <div style={styles.botsToggleRow}>
+            <label style={styles.botsToggleLabel}>
+              <input
+                type="checkbox"
+                checked={botsAllowed}
+                onChange={handleToggleBots}
+                disabled={togglingBots}
+                style={styles.botsCheckbox}
+              />
+              <span>🤖 Allow Bots</span>
+            </label>
+          </div>
         )}
 
         {isHost && (
@@ -144,7 +223,7 @@ export default function LobbyPage({
         )}
 
         {!isHost && (
-          <p style={styles.muted}>Waiting for the host to start the game…</p>
+          <p style={styles.waitingText}>Waiting for the host to start the game…</p>
         )}
       </div>
     </div>
@@ -153,69 +232,168 @@ export default function LobbyPage({
 
 const styles: Record<string, React.CSSProperties> = {
   wrapper: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    minHeight: '100vh',
-    padding: 16,
-    fontFamily: 'system-ui, sans-serif',
+    ...commonStyles.pageWrapper,
   },
   container: {
-    width: '100%',
-    maxWidth: 480,
-    paddingTop: 24,
+    ...commonStyles.pageContainer,
   },
   backBtn: {
     background: 'none',
     border: 'none',
-    color: '#4f46e5',
+    color: colors.primary,
     cursor: 'pointer',
     fontSize: 14,
+    fontWeight: 500,
     padding: 0,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  title: { margin: '0 0 12px' },
-  codeBox: {
+  headerCard: {
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+    padding: 20,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    margin: '0 0 12px',
+    fontSize: 22,
+    fontWeight: 700,
+    color: colors.textPrimary,
+  },
+  codeRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 14,
+  },
+  codeLabel: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  code: {
+    fontSize: 32,
+    fontWeight: 800,
+    letterSpacing: 6,
+    color: colors.secondary,
+  },
+  copyBtn: {
+    padding: '8px 20px',
+    fontSize: 13,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: `2px solid ${colors.primary}`,
+    background: 'transparent',
+    color: colors.primary,
+    cursor: 'pointer',
+  },
+  status: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    margin: '0 0 12px',
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
-    padding: '12px 16px',
-    borderRadius: 8,
-    background: '#f5f3ff',
-    border: '1px solid #ddd6fe',
-    marginBottom: 12,
   },
-  codeLabel: { fontSize: 14, color: '#666' },
-  code: {
-    fontSize: 24,
+  error: {
+    color: colors.error,
+    fontSize: 14,
+    margin: '0 0 12px',
+  },
+  playersSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: 700,
-    letterSpacing: 4,
-    color: '#4f46e5',
+    margin: '0 0 12px',
+    color: colors.textPrimary,
   },
-  status: { fontSize: 14, margin: '0 0 12px' },
-  error: { color: '#d32f2f', fontSize: 14, margin: '0 0 12px' },
-  sectionTitle: { fontSize: 18, margin: '0 0 8px' },
-  muted: { color: '#888', fontSize: 14, margin: '4px 0 12px' },
+  muted: {
+    color: colors.textMuted,
+    fontSize: 14,
+    margin: 0,
+  },
   list: {
     listStyle: 'none',
     padding: 0,
+    margin: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  playerItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 16px',
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.button,
+  },
+  playerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  },
+  onlineDot: {
+    display: 'inline-block',
+    width: 8,
+    height: 8,
+    borderRadius: '50%',
+    background: colors.success,
+  },
+  playerName: {
+    fontSize: 15,
+    fontWeight: 500,
+    color: colors.textPrimary,
+  },
+  hostBadge: {
+    fontSize: 18,
+  },
+  waitingText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
     margin: '0 0 16px',
   },
-  listItem: {
-    padding: '8px 12px',
-    borderRadius: 6,
-    border: '1px solid #e0e0e0',
-    marginBottom: 6,
-    fontSize: 16,
-  },
   startBtn: {
-    padding: '14px 0',
+    padding: '16px 0',
     fontSize: 16,
-    fontWeight: 600,
-    borderRadius: 6,
+    fontWeight: 700,
+    borderRadius: radii.button,
     border: 'none',
-    background: '#16a34a',
-    color: '#fff',
+    background: `linear-gradient(135deg, ${colors.primary}, ${colors.success})`,
+    color: '#ffffff',
     width: '100%',
+  },
+  botBadge: {
+    fontSize: 14,
+  },
+  botsToggleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: 12,
+    padding: '10px 14px',
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.button,
+  },
+  botsToggleLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14,
+    fontWeight: 500,
+    color: colors.textSecondary,
+    cursor: 'pointer',
+  },
+  botsCheckbox: {
+    width: 18,
+    height: 18,
+    cursor: 'pointer',
+    accentColor: colors.primary,
   },
 };
