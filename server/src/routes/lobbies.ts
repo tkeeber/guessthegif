@@ -106,6 +106,16 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
 
     const playerId = playerResult.rows[0].id;
 
+    // Remove player from any existing waiting/closed lobbies (one lobby at a time rule)
+    await pool.query(
+      `DELETE FROM lobby_players
+        WHERE player_id = $1
+          AND lobby_id IN (
+            SELECT id FROM lobbies WHERE status IN ('waiting', 'closed')
+          )`,
+      [playerId]
+    );
+
     const joinCode = await generateUniqueJoinCode();
 
     // Accept optional botsAllowed param (defaults to true)
@@ -171,6 +181,16 @@ router.post('/:code/join', requireAuth, async (req: AuthenticatedRequest, res: R
     }
 
     const playerId = playerResult.rows[0].id;
+
+    // Remove player from any existing waiting/closed lobbies (one lobby at a time rule)
+    await pool.query(
+      `DELETE FROM lobby_players
+        WHERE player_id = $1
+          AND lobby_id IN (
+            SELECT id FROM lobbies WHERE status IN ('waiting', 'closed')
+          )`,
+      [playerId]
+    );
 
     // Find lobby by join code
     const lobbyResult = await pool.query(
