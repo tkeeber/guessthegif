@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { apiFetch } from '../lib/api';
 import { colors, radii, commonStyles } from '../styles/theme';
@@ -40,6 +40,7 @@ export default function LobbyPage({
 }: LobbyPageProps) {
   const { socket, connected } = useSocket();
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
+  const playersRef = useRef<LobbyPlayer[]>([]);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [isHost, setIsHost] = useState(!hostId);
@@ -54,13 +55,14 @@ export default function LobbyPage({
 
     function handleLobbyUpdate(payload: { players: LobbyPlayer[]; hostSupabaseId?: string }) {
       setPlayers(payload.players);
+      playersRef.current = payload.players;
       if (payload.hostSupabaseId) {
         setIsHost(payload.hostSupabaseId === currentUserId);
       }
     }
 
     function handleRoundStart(payload: { roundNumber: number; gifUrl: string }) {
-      onGameStart(lobbyId, { roundNumber: payload.roundNumber, gifUrl: payload.gifUrl, players });
+      onGameStart(lobbyId, { roundNumber: payload.roundNumber, gifUrl: payload.gifUrl, players: playersRef.current });
     }
 
     function handleError(payload: { message?: string }) {

@@ -40,7 +40,6 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
-  const [botsAllowed, setBotsAllowed] = useState(true);
   const [playerRank, setPlayerRank] = useState<number | null>(null);
   const [playerPoints, setPlayerPoints] = useState<number | null>(null);
   const [playerUsername, setPlayerUsername] = useState<string>('');
@@ -90,7 +89,6 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
       setError('');
       const data = await apiFetch<CreateLobbyResponse>('/api/lobbies', {
         method: 'POST',
-        body: JSON.stringify({ botsAllowed }),
       });
       onEnterLobby(data.lobby.id, data.lobby.join_code, '');
     } catch (err) {
@@ -162,19 +160,6 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
           </button>
         )}
 
-        {/* Bots toggle + Action buttons */}
-        <div style={styles.botsToggleRow}>
-          <label style={styles.botsToggleLabel}>
-            <input
-              type="checkbox"
-              checked={botsAllowed}
-              onChange={(e) => setBotsAllowed(e.target.checked)}
-              style={styles.botsCheckbox}
-            />
-            <span>🤖 Allow Bots</span>
-          </label>
-        </div>
-
         {/* Action buttons */}
         <div style={styles.actionRow}>
           <button
@@ -240,7 +225,6 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
                     </span>
                     <span style={styles.playerCount}>
                       {lobby.playerCount} player{lobby.playerCount !== 1 ? 's' : ''}
-                      {lobby.botsAllowed && <span style={styles.botIndicator}> 🤖</span>}
                     </span>
                   </div>
                   <button
