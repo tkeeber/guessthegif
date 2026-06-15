@@ -84,6 +84,53 @@ router.get('/', requireAuth, async (_req: AuthenticatedRequest, res: Response): 
   }
 });
 
+// GET /api/lobbies/active
+// Check if the current player is in an active (in_session) lobby
+router.get('/active', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'unauthorized', message: 'Not authenticated' });
+      return;
+    }
+
+    const playerResult = await pool.query(
+      'SELECT id FROM players WHERE supabase_user_id = $1',
+      [req.user.id]
+    );
+    if (playerResult.rows.length === 0) {
+      res.status(200).json({ activeLobby: null });
+      return;
+    }
+
+    const playerId = playerResult.rows[0].id;
+
+    const result = await pool.query(
+      `SELECT l.id, l.join_code, l.host_id
+         FROM lobby_players lp
+         JOIN lobbies l ON l.id = lp.lobby_id
+        WHERE lp.player_id = $1 AND l.status = 'in_session'
+        LIMIT 1`,
+      [playerId]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(200).json({ activeLobby: null });
+      return;
+    }
+
+    res.status(200).json({
+      activeLobby: {
+        id: result.rows[0].id,
+        joinCode: result.rows[0].join_code,
+        hostId: result.rows[0].host_id,
+      },
+    });
+  } catch (error) {
+    console.error('Active lobby check error:', error);
+    res.status(200).json({ activeLobby: null });
+  }
+});
+
 // POST /api/lobbies
 // Create a new lobby with a unique 6-char join code, add host as first player
 router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {

@@ -44,6 +44,7 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
   const [playerRank, setPlayerRank] = useState<number | null>(null);
   const [playerPoints, setPlayerPoints] = useState<number | null>(null);
   const [playerUsername, setPlayerUsername] = useState<string>('');
+  const [activeGame, setActiveGame] = useState<{ id: string; joinCode: string; hostId: string } | null>(null);
 
   async function fetchLobbies() {
     try {
@@ -60,6 +61,10 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
 
   useEffect(() => {
     fetchLobbies();
+    // Check for active game the player can rejoin
+    apiFetch<{ activeLobby: { id: string; joinCode: string; hostId: string } | null }>('/api/lobbies/active')
+      .then((data) => setActiveGame(data.activeLobby))
+      .catch(() => {});
     // Fetch player stats from leaderboard
     apiFetch<{ seasonId: string; entries: { rank: number; playerId: string; username: string; correctGuessCount: number }[] }>('/api/leaderboard')
       .then((data) => {
@@ -146,6 +151,16 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
             <span style={styles.statLabel}>Points</span>
           </div>
         </div>
+
+        {/* Rejoin active game banner */}
+        {activeGame && (
+          <button
+            onClick={() => onEnterLobby(activeGame.id, activeGame.joinCode, activeGame.hostId)}
+            style={styles.rejoinBanner}
+          >
+            🎮 You have an active game — tap to rejoin
+          </button>
+        )}
 
         {/* Bots toggle + Action buttons */}
         <div style={styles.botsToggleRow}>
@@ -506,5 +521,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   botIndicator: {
     fontSize: 13,
+  },
+  rejoinBanner: {
+    width: '100%',
+    padding: '14px 16px',
+    fontSize: 15,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: `1px solid ${colors.success}`,
+    background: 'rgba(34, 197, 94, 0.1)',
+    color: colors.success,
+    cursor: 'pointer',
+    textAlign: 'center' as const,
+    marginBottom: 12,
   },
 };
