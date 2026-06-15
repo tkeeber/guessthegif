@@ -41,6 +41,8 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [botsAllowed, setBotsAllowed] = useState(true);
+  const [playerRank, setPlayerRank] = useState<number | null>(null);
+  const [playerPoints, setPlayerPoints] = useState<number | null>(null);
 
   async function fetchLobbies() {
     try {
@@ -57,6 +59,22 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
 
   useEffect(() => {
     fetchLobbies();
+    // Fetch player stats from leaderboard
+    apiFetch<{ seasonId: string; entries: { rank: number; playerId: string; username: string; correctGuessCount: number }[] }>('/api/leaderboard')
+      .then((data) => {
+        // Find current player's entry by fetching their profile first
+        apiFetch<{ player: { username: string } }>('/api/auth/me').then((profile) => {
+          const myEntry = data.entries.find((e) => e.username === profile.player.username);
+          if (myEntry) {
+            setPlayerRank(myEntry.rank);
+            setPlayerPoints(myEntry.correctGuessCount);
+          } else {
+            setPlayerRank(0);
+            setPlayerPoints(0);
+          }
+        }).catch(() => {});
+      })
+      .catch(() => {});
   }, []);
 
   async function handleCreate() {
@@ -118,11 +136,11 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
         {/* Stats row */}
         <div style={styles.statsRow}>
           <div style={styles.statCard}>
-            <span style={styles.statValue}>—</span>
+            <span style={styles.statValue}>{playerRank != null ? (playerRank || '—') : '…'}</span>
             <span style={styles.statLabel}>Rank</span>
           </div>
           <div style={styles.statCard}>
-            <span style={styles.statValue}>—</span>
+            <span style={styles.statValue}>{playerPoints != null ? playerPoints : '…'}</span>
             <span style={styles.statLabel}>Points</span>
           </div>
         </div>
