@@ -18,38 +18,28 @@ export interface FeedEntry {
 
 interface GuessFeedProps {
   entries: FeedEntry[];
-  onSubmitGuess: (text: string) => void;
-  onSubmitChat: (text: string) => void;
+  onSubmit: (text: string) => void;
   disabled?: boolean;
 }
 
 export default function GuessFeed({
   entries,
-  onSubmitGuess,
-  onSubmitChat,
+  onSubmit,
   disabled = false,
 }: GuessFeedProps) {
   const feedEndRef = useRef<HTMLDivElement>(null);
-  const guessInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to latest entry
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [entries.length]);
 
-  function handleGuessSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const input = guessInputRef.current;
+    const input = inputRef.current;
     if (!input || !input.value.trim()) return;
-    onSubmitGuess(input.value.trim());
-    input.value = '';
-  }
-
-  function handleChatSubmit(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== 'Enter') return;
-    const input = e.currentTarget;
-    if (!input.value.trim()) return;
-    onSubmitChat(input.value.trim());
+    onSubmit(input.value.trim());
     input.value = '';
   }
 
@@ -65,7 +55,7 @@ export default function GuessFeed({
   return (
     <div style={styles.container}>
       {/* Scrollable feed */}
-      <div style={styles.feed} role="log" aria-label="Guess feed">
+      <div style={styles.feed} role="log" aria-label="Game feed">
         {entries.length === 0 && (
           <p style={styles.empty}>No guesses yet. Be the first!</p>
         )}
@@ -75,7 +65,6 @@ export default function GuessFeed({
             style={{
               ...styles.entry,
               ...(entry.isCorrect ? styles.correctEntry : {}),
-              ...(entry.type === 'chat' ? styles.chatEntry : {}),
             }}
           >
             <div style={styles.entryHeader}>
@@ -86,41 +75,27 @@ export default function GuessFeed({
               </span>
               <span style={styles.timestamp}>{formatTime(entry.timestamp)}</span>
             </div>
-            <div style={styles.entryText}>
-              {entry.type === 'chat' && <span style={styles.chatPrefix}>💬 </span>}
-              {entry.text}
-            </div>
+            <div style={styles.entryText}>{entry.text}</div>
           </div>
         ))}
         <div ref={feedEndRef} />
       </div>
 
-      {/* Guess input */}
-      <form onSubmit={handleGuessSubmit} style={styles.inputRow}>
+      {/* Single input — everything is a guess */}
+      <form onSubmit={handleSubmit} style={styles.inputRow}>
         <input
-          ref={guessInputRef}
+          ref={inputRef}
           type="text"
-          placeholder={disabled ? 'Round not active' : 'Type your guess…'}
+          placeholder={disabled ? 'Waiting for next round…' : 'Type your guess…'}
           disabled={disabled}
           style={styles.input}
           aria-label="Guess input"
+          autoComplete="off"
         />
         <button type="submit" disabled={disabled} style={styles.submitBtn}>
-          Guess
+          Send
         </button>
       </form>
-
-      {/* Chat input */}
-      <div style={styles.inputRow}>
-        <input
-          type="text"
-          placeholder={disabled ? 'Chat disabled' : 'Chat message…'}
-          disabled={disabled}
-          onKeyDown={handleChatSubmit}
-          style={{ ...styles.input, ...styles.chatInput }}
-          aria-label="Chat input"
-        />
-      </div>
     </div>
   );
 }
@@ -163,10 +138,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(34, 197, 94, 0.1)',
     border: `1px solid ${colors.success}`,
   },
-  chatEntry: {
-    background: 'rgba(124, 58, 237, 0.1)',
-    border: `1px solid ${colors.primary}`,
-  },
   entryHeader: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -192,32 +163,26 @@ const styles: Record<string, React.CSSProperties> = {
     color: colors.textSecondary,
     wordBreak: 'break-word' as const,
   },
-  chatPrefix: {
-    fontSize: 13,
-  },
   botBadge: {
     fontSize: 12,
   },
   inputRow: {
     display: 'flex',
     gap: 8,
-    marginTop: 6,
+    marginTop: 8,
   },
   input: {
     flex: 1,
-    padding: '10px 12px',
-    fontSize: 15,
+    padding: '12px 14px',
+    fontSize: 16,
     borderRadius: radii.input,
     border: `1px solid ${colors.inputBorder}`,
     background: colors.inputBg,
     color: colors.textPrimary,
     outline: 'none',
   },
-  chatInput: {
-    borderColor: colors.primary,
-  },
   submitBtn: {
-    padding: '10px 20px',
+    padding: '12px 20px',
     fontSize: 15,
     fontWeight: 600,
     borderRadius: radii.button,

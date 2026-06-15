@@ -106,6 +106,7 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
 
   // Notifications
   const [notification, setNotification] = useState('');
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   // Timer interval ref
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -301,10 +302,6 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
     socket?.emit('guess:submit', { text });
   }
 
-  function handleSubmitChat(text: string) {
-    socket?.emit('chat:message', { text });
-  }
-
   // ---------------------------------------------------------------------------
   // Render helpers
   // ---------------------------------------------------------------------------
@@ -428,22 +425,48 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
   return (
     <div style={styles.wrapper}>
       <div style={styles.container}>
-        {/* Header: round number + timer */}
+        {/* Header: round number + timer + exit */}
         <div style={styles.header}>
           <span style={styles.roundLabel}>
             Round {roundNumber}/3
           </span>
-          {isRoundActive && (
-            <span
-              style={{
-                ...styles.timerLabel,
-                color: timer <= 10 ? colors.error : colors.textPrimary,
-              }}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {isRoundActive && (
+              <span
+                style={{
+                  ...styles.timerLabel,
+                  color: timer <= 10 ? colors.error : colors.textPrimary,
+                }}
+              >
+                ⏱ {formatTimer(timer)}
+              </span>
+            )}
+            <button
+              onClick={() => setShowExitConfirm(true)}
+              style={styles.exitBtn}
+              aria-label="Exit game"
             >
-              ⏱ {formatTimer(timer)}
-            </span>
-          )}
+              ✕
+            </button>
+          </div>
         </div>
+
+        {/* Exit confirmation */}
+        {showExitConfirm && (
+          <div style={styles.confirmOverlay}>
+            <div style={styles.confirmBox}>
+              <p style={styles.confirmText}>Are you sure you want to exit the game?</p>
+              <div style={styles.confirmButtons}>
+                <button onClick={onBack} style={styles.confirmYes}>
+                  Yes, exit
+                </button>
+                <button onClick={() => setShowExitConfirm(false)} style={styles.confirmNo}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {notification && (
           <div style={styles.notification}>{notification}</div>
@@ -497,8 +520,7 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
         {/* Guess feed */}
         <GuessFeed
           entries={feedEntries}
-          onSubmitGuess={handleSubmitGuess}
-          onSubmitChat={handleSubmitChat}
+          onSubmit={handleSubmitGuess}
           disabled={!isRoundActive}
         />
       </div>
@@ -647,5 +669,65 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: `1px solid ${colors.surfaceBorder}`,
     fontSize: 15,
     color: colors.textPrimary,
+  },
+  exitBtn: {
+    padding: '6px 10px',
+    fontSize: 16,
+    borderRadius: radii.button,
+    border: `1px solid ${colors.surfaceBorder}`,
+    background: colors.surface,
+    color: colors.textMuted,
+    cursor: 'pointer',
+    lineHeight: 1,
+  },
+  confirmOverlay: {
+    position: 'fixed' as const,
+    inset: 0,
+    background: 'rgba(0, 0, 0, 0.7)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  confirmBox: {
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+    padding: '24px 28px',
+    textAlign: 'center' as const,
+    maxWidth: 320,
+    width: '90%',
+  },
+  confirmText: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: 500,
+    margin: '0 0 20px',
+  },
+  confirmButtons: {
+    display: 'flex',
+    gap: 12,
+  },
+  confirmYes: {
+    flex: 1,
+    padding: '12px 0',
+    fontSize: 15,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: 'none',
+    background: colors.error,
+    color: '#fff',
+    cursor: 'pointer',
+  },
+  confirmNo: {
+    flex: 1,
+    padding: '12px 0',
+    fontSize: 15,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: `1px solid ${colors.surfaceBorder}`,
+    background: 'transparent',
+    color: colors.textSecondary,
+    cursor: 'pointer',
   },
 };
