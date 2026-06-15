@@ -76,6 +76,11 @@ export async function startRound(
   const gifUrl: string = gifResult.rows[0].gif_url;
 
   // Broadcast round:start
+  const socketsInRoom = io.sockets.adapter.rooms.get(lobbyId);
+  console.log('[roundManager:startRound] Broadcasting round:start to lobby:', lobbyId);
+  console.log('[roundManager:startRound] Sockets in room:', socketsInRoom ? socketsInRoom.size : 0);
+  console.log('[roundManager:startRound] Round number:', round.round_number, 'GIF URL:', gifUrl.substring(0, 60));
+
   io.to(lobbyId).emit('round:start', {
     roundNumber: round.round_number,
     gifUrl,

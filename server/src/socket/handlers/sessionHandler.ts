@@ -6,18 +6,15 @@ import { SessionStartPayload, WSErrorPayload } from '../../types/websocket';
 
 /**
  * Register the session:start event handler on a socket.
- *
- * Flow:
- * 1. Host emits `session:start` from the lobby
- * 2. Server resolves the player's lobby membership
- * 3. Calls sessionService.startSession to validate and create session + rounds
- * 4. Delegates to sessionOrchestrator.startFirstRound to activate and broadcast the first round
  */
 export function registerSessionHandler(
   io: TypedServer,
   socket: AuthenticatedSocket
 ): void {
   socket.on('session:start', async (_payload: SessionStartPayload) => {
+    console.log('[session:start] Received from player:', socket.data.playerId);
+    console.log('[session:start] Socket rooms:', Array.from(socket.rooms));
+
     try {
       const playerId = socket.data.playerId;
 
@@ -30,7 +27,10 @@ export function registerSessionHandler(
         [playerId]
       );
 
+      console.log('[session:start] Lobby query result rows:', lobbyResult.rows.length);
+
       if (lobbyResult.rows.length === 0) {
+        console.log('[session:start] ERROR: Player is not host of any waiting lobby');
         const errorPayload: WSErrorPayload = {
           code: 'not_authorized',
           message: 'You are not the host of any waiting lobby.',
@@ -41,15 +41,21 @@ export function registerSessionHandler(
       }
 
       const lobbyId = lobbyResult.rows[0].id;
+      console.log('[session:start] Found lobby:', lobbyId);
 
       // Start the session (validates players, GIFs, creates session + rounds)
+      console.log('[session:start] Calling startSession...');
       const result = await startSession(lobbyId, playerId);
+      console.log('[session:start] Session created:', result.session.id, 'with', result.rounds.length, 'rounds');
 
-      // Use the orchestrator to start the first round (activates, broadcasts, starts timer)
+      // Use the orchestrator to start the first round
+      console.log('[session:start] Calling startFirstRound...');
       await startFirstRound(io, result.session.id, lobbyId);
+      console.log('[session:start] First round started successfully');
+
     } catch (error) {
       if (error instanceof SessionError) {
-        console.log('[session:start] Error:', error.code, error.message);
+        console.log('[session:start] SessionError:', error.code, error.message);
         const errorPayload: WSErrorPayload = {
           code: error.code,
           message: error.message,

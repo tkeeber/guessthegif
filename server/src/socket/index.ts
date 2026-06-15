@@ -232,6 +232,7 @@ export function initSocketServer(httpServer: HttpServer): TypedServer {
     const lobbyId = socket.handshake.query.lobbyId as string | undefined;
     if (lobbyId) {
       socket.join(lobbyId);
+      console.log(`[socket:connect] Player ${playerId} joined room ${lobbyId} (socket ${socket.id})`);
 
       // Broadcast updated player list to everyone in the lobby
       broadcastLobbyUpdate(io, lobbyId).catch((err) =>
