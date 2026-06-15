@@ -44,18 +44,13 @@ export function registerGuessHandler(
         return;
       }
 
-      // Find the player's lobby
-      const lobbyResult = await pool.query(
-        `SELECT lp.lobby_id
-           FROM lobby_players lp
-           JOIN lobbies l ON l.id = lp.lobby_id
-          WHERE lp.player_id = $1 AND l.status = 'in_session'
-          LIMIT 1`,
-        [playerId]
-      );
+      // Find the player's lobby from the socket's room membership
+      const socketRooms = Array.from(socket.rooms);
+      // The lobby room is any room that's not the socket's own ID
+      const lobbyId = socketRooms.find((room) => room !== socket.id);
 
-      if (lobbyResult.rows.length === 0) {
-        console.log('[guess:submit] ERROR: Player not in any active session');
+      if (!lobbyId) {
+        console.log('[guess:submit] ERROR: Socket is not in any lobby room');
         const errorPayload: WSErrorPayload = {
           code: 'round_not_active',
           message: 'You are not in an active session.',
@@ -65,8 +60,7 @@ export function registerGuessHandler(
         return;
       }
 
-      const lobbyId = lobbyResult.rows[0].lobby_id;
-      console.log('[guess:submit] Found lobby:', lobbyId);
+      console.log('[guess:submit] Found lobby from socket room:', lobbyId);
 
       // Find the active round for this lobby's session
       const roundResult = await pool.query(
