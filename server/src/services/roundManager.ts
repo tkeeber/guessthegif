@@ -214,6 +214,8 @@ export async function submitGuess(
       );
     } else {
       // --- Incorrect guess path ---
+      const roomSockets = io.sockets.adapter.rooms.get(lobbyId);
+      console.log('[submitGuess] Broadcasting guess:new to lobby:', lobbyId, 'sockets in room:', roomSockets ? roomSockets.size : 0);
       io.to(lobbyId).emit('guess:new', {
         username,
         text,
