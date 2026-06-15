@@ -175,6 +175,7 @@ export default function GamePage({ lobbyId, initialRound, onBack }: GamePageProp
         // Listen for error events from server
         socket.on('error' as any, (payload: { code?: string; message?: string }) => {
           if (!mounted) return;
+          console.log('[GamePage] Socket error received:', payload);
           setSocketError(payload.message ?? 'An error occurred');
         });
 

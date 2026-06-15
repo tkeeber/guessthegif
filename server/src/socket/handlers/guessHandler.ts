@@ -55,6 +55,7 @@ export function registerGuessHandler(
       );
 
       if (lobbyResult.rows.length === 0) {
+        console.log('[guess:submit] ERROR: Player not in any active session');
         const errorPayload: WSErrorPayload = {
           code: 'round_not_active',
           message: 'You are not in an active session.',
@@ -65,6 +66,7 @@ export function registerGuessHandler(
       }
 
       const lobbyId = lobbyResult.rows[0].lobby_id;
+      console.log('[guess:submit] Found lobby:', lobbyId);
 
       // Find the active round for this lobby's session
       const roundResult = await pool.query(
@@ -79,6 +81,7 @@ export function registerGuessHandler(
       );
 
       if (roundResult.rows.length === 0) {
+        console.log('[guess:submit] ERROR: No active round found for lobby:', lobbyId);
         const errorPayload: WSErrorPayload = {
           code: 'round_not_active',
           message: 'No active round to submit a guess to.',
@@ -89,8 +92,10 @@ export function registerGuessHandler(
       }
 
       const roundId = roundResult.rows[0].id;
+      console.log('[guess:submit] Found active round:', roundId, '→ calling submitGuess');
 
       await submitGuess(io, roundId, playerId, text.trim(), lobbyId);
+      console.log('[guess:submit] submitGuess completed successfully');
     } catch (error) {
       if (error instanceof RoundError) {
         const errorPayload: WSErrorPayload = {
