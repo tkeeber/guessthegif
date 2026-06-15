@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import type { Socket } from 'socket.io-client';
-import { createSocket } from '../lib/socket';
+import { useSocket } from '../contexts/SocketContext';
 import GuessFeed, { FeedEntry } from '../components/GuessFeed';
 import { colors, radii, fonts, commonStyles } from '../styles/theme';
 
@@ -54,7 +53,6 @@ interface PlayerDisconnectedPayload {
 }
 
 type GamePhase =
-  | 'connecting'
   | 'waiting'       // waiting for round to start (between rounds)
   | 'active'        // round in progress
   | 'round-result'  // showing round result briefly
@@ -83,10 +81,9 @@ interface GamePageProps {
 
 let feedIdCounter = 0;
 
-export default function GamePage({ lobbyId, initialRound, onBack }: GamePageProps) {
-  const socketRef = useRef<Socket | null>(null);
-  const [phase, setPhase] = useState<GamePhase>('connecting');
-  const [reconnecting, setReconnecting] = useState(false);
+export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: GamePageProps) {
+  const { socket, connected } = useSocket();
+  const [phase, setPhase] = useState<GamePhase>('waiting');
   const [socketError, setSocketError] = useState('');
 
   // Round state
@@ -112,7 +109,6 @@ export default function GamePage({ lobbyId, initialRound, onBack }: GamePageProp
 
   // Timer interval ref
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const roundStartTimeRef = useRef<number>(0);
   const clueReceivedRef = useRef(false);
 
   // ---------------------------------------------------------------------------
@@ -141,232 +137,172 @@ export default function GamePage({ lobbyId, initialRound, onBack }: GamePageProp
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Socket connection and event wiring
+  // Use initial round data on mount
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    let mounted = true;
-    let startTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    if (initialRound) {
+      setPhase('active');
+      setRoundNumber(initialRound.roundNumber);
+      setGifUrl(initialRound.gifUrl);
+      setClue(null);
+      setRoundResult(null);
+      setFeedEntries([]);
+      setBetweenRoundCountdown(0);
+      clueReceivedRef.current = false;
+      startCountdown(120);
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    async function connect() {
-      try {
-        const socket = await createSocket(lobbyId);
-        if (!mounted) { socket.disconnect(); return; }
-        socketRef.current = socket;
+  // ---------------------------------------------------------------------------
+  // Socket event wiring
+  // ---------------------------------------------------------------------------
 
-        socket.on('connect', () => {
-          if (!mounted) return;
-          console.log('[GamePage] Socket connected, id:', socket.id);
-          setReconnecting(false);
-          // If we were disconnected, we're back
-          setPhase((prev) => (prev === 'disconnected' ? 'waiting' : prev));
-        });
+  useEffect(() => {
+    if (!socket) return;
 
-        socket.on('disconnect', () => {
-          if (!mounted) return;
-          setReconnecting(true);
-        });
-
-        socket.on('connect_error', () => {
-          if (!mounted) return;
-          setReconnecting(true);
-        });
-
-        // Listen for error events from server
-        socket.on('error' as any, (payload: { code?: string; message?: string }) => {
-          if (!mounted) return;
-          console.log('[GamePage] Socket error received:', payload);
-          setSocketError(payload.message ?? 'An error occurred');
-        });
-
-        // --- Game events ---
-
-        socket.on('round:start', (payload: RoundStartPayload) => {
-          if (!mounted) return;
-          // Clear the start timeout since we got a round
-          if (startTimeoutId) { clearTimeout(startTimeoutId); startTimeoutId = null; }
-          setPhase('active');
-          setRoundNumber(payload.roundNumber);
-          setGifUrl(payload.gifUrl);
-          setClue(null);
-          setRoundResult(null);
-          setFeedEntries([]);
-          setBetweenRoundCountdown(0);
-          clueReceivedRef.current = false;
-          roundStartTimeRef.current = Date.now();
-          startCountdown(120); // 120s initial timer
-        });
-
-        socket.on('round:clue', (payload: RoundCluePayload) => {
-          if (!mounted) return;
-          setClue({ type: payload.clueType, text: payload.clueText });
-          clueReceivedRef.current = true;
-          startCountdown(60); // 60s post-clue timer
-        });
-
-        socket.on('round:won', (payload: RoundWonPayload) => {
-          if (!mounted) return;
-          stopTimer();
-          setRoundResult({
-            type: 'won',
-            winnerUsername: payload.winnerUsername,
-            filmName: payload.filmName,
-          });
-          setPhase('round-result');
-          // Start 5-second between-round countdown
-          startBetweenRoundCountdown();
-        });
-
-        socket.on('round:timeout', (payload: RoundTimeoutPayload) => {
-          if (!mounted) return;
-          stopTimer();
-          setRoundResult({
-            type: 'timeout',
-            filmName: payload.filmName,
-          });
-          setPhase('round-result');
-          startBetweenRoundCountdown();
-        });
-
-        socket.on('guess:new', (payload: GuessNewPayload) => {
-          if (!mounted) return;
-          setFeedEntries((prev) => [
-            ...prev,
-            {
-              id: `guess-${++feedIdCounter}`,
-              type: 'guess',
-              username: payload.username,
-              text: payload.text,
-              timestamp: payload.timestamp,
-              isCorrect: payload.isCorrect,
-            },
-          ]);
-        });
-
-        socket.on('chat:new', (payload: ChatNewPayload) => {
-          if (!mounted) return;
-          setFeedEntries((prev) => [
-            ...prev,
-            {
-              id: `chat-${++feedIdCounter}`,
-              type: 'chat',
-              username: payload.username,
-              text: payload.text,
-              timestamp: payload.timestamp,
-            },
-          ]);
-        });
-
-        socket.on('session:end', (payload: SessionEndPayload) => {
-          if (!mounted) return;
-          stopTimer();
-          setBetweenRoundCountdown(0);
-          setSessionScores(payload.scores);
-          setSessionSummary(payload.sessionSummary);
-          setPhase('session-end');
-        });
-
-        socket.on('season:won', (payload: SeasonWonPayload) => {
-          if (!mounted) return;
-          setSeasonWinner(payload.winnerUsername);
-        });
-
-        socket.on('player:disconnected', (payload: PlayerDisconnectedPayload) => {
-          if (!mounted) return;
-          setNotification(`${payload.username} disconnected`);
-          setTimeout(() => {
-            if (mounted) setNotification('');
-          }, 4000);
-        });
-
-        // If we have initial round data (passed from LobbyPage), use it immediately
-        if (initialRound) {
-          setPhase('active');
-          setRoundNumber(initialRound.roundNumber);
-          setGifUrl(initialRound.gifUrl);
-          setClue(null);
-          setRoundResult(null);
-          setFeedEntries([]);
-          setBetweenRoundCountdown(0);
-          clueReceivedRef.current = false;
-          roundStartTimeRef.current = Date.now();
-          startCountdown(120);
-        } else {
-          // Connection established — wait for round:start with a 15s timeout
-          setPhase('waiting');
-          startTimeoutId = setTimeout(() => {
-            if (!mounted) return;
-            setPhase((currentPhase) => {
-              if (currentPhase === 'waiting') {
-                setSocketError('Failed to start session. Please go back and try again.');
-                return 'disconnected';
-              }
-              return currentPhase;
-            });
-          }, 15_000);
-        }
-      } catch {
-        if (mounted) setPhase('disconnected');
-      }
+    function handleRoundStart(payload: RoundStartPayload) {
+      setPhase('active');
+      setRoundNumber(payload.roundNumber);
+      setGifUrl(payload.gifUrl);
+      setClue(null);
+      setRoundResult(null);
+      setFeedEntries([]);
+      setBetweenRoundCountdown(0);
+      clueReceivedRef.current = false;
+      startCountdown(120);
     }
 
-    function startBetweenRoundCountdown() {
-      setBetweenRoundCountdown(5);
-      let count = 5;
-      const iv = setInterval(() => {
-        count--;
-        if (!mounted) { clearInterval(iv); return; }
-        setBetweenRoundCountdown(count);
-        if (count <= 0) clearInterval(iv);
-      }, 1000);
+    function handleRoundClue(payload: RoundCluePayload) {
+      setClue({ type: payload.clueType, text: payload.clueText });
+      clueReceivedRef.current = true;
+      startCountdown(60);
     }
 
-    connect();
+    function handleRoundWon(payload: RoundWonPayload) {
+      stopTimer();
+      setRoundResult({
+        type: 'won',
+        winnerUsername: payload.winnerUsername,
+        filmName: payload.filmName,
+      });
+      setPhase('round-result');
+      startBetweenRoundCountdown();
+    }
 
-    // Reconnection timeout: if reconnecting for > 30s, give up
-    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-    const checkReconnect = setInterval(() => {
-      if (!mounted) return;
-      // If socket is disconnected, start a 30s timer
-      const sock = socketRef.current;
-      if (sock && !sock.connected) {
-        if (!reconnectTimeout) {
-          reconnectTimeout = setTimeout(() => {
-            if (!mounted) return;
-            setPhase('disconnected');
-            setReconnecting(false);
-          }, 30_000);
-        }
-      } else {
-        if (reconnectTimeout) {
-          clearTimeout(reconnectTimeout);
-          reconnectTimeout = null;
-        }
-      }
-    }, 2000);
+    function handleRoundTimeout(payload: RoundTimeoutPayload) {
+      stopTimer();
+      setRoundResult({
+        type: 'timeout',
+        filmName: payload.filmName,
+      });
+      setPhase('round-result');
+      startBetweenRoundCountdown();
+    }
+
+    function handleGuessNew(payload: GuessNewPayload) {
+      setFeedEntries((prev) => [
+        ...prev,
+        {
+          id: `guess-${++feedIdCounter}`,
+          type: 'guess',
+          username: payload.username,
+          text: payload.text,
+          timestamp: payload.timestamp,
+          isCorrect: payload.isCorrect,
+        },
+      ]);
+    }
+
+    function handleChatNew(payload: ChatNewPayload) {
+      setFeedEntries((prev) => [
+        ...prev,
+        {
+          id: `chat-${++feedIdCounter}`,
+          type: 'chat',
+          username: payload.username,
+          text: payload.text,
+          timestamp: payload.timestamp,
+        },
+      ]);
+    }
+
+    function handleSessionEnd(payload: SessionEndPayload) {
+      stopTimer();
+      setBetweenRoundCountdown(0);
+      setSessionScores(payload.scores);
+      setSessionSummary(payload.sessionSummary);
+      setPhase('session-end');
+    }
+
+    function handleSeasonWon(payload: SeasonWonPayload) {
+      setSeasonWinner(payload.winnerUsername);
+    }
+
+    function handlePlayerDisconnected(payload: PlayerDisconnectedPayload) {
+      setNotification(`${payload.username} disconnected`);
+      setTimeout(() => setNotification(''), 4000);
+    }
+
+    function handleError(payload: { code?: string; message?: string }) {
+      setSocketError(payload.message ?? 'An error occurred');
+    }
+
+    socket.on('round:start', handleRoundStart);
+    socket.on('round:clue', handleRoundClue);
+    socket.on('round:won', handleRoundWon);
+    socket.on('round:timeout', handleRoundTimeout);
+    socket.on('guess:new', handleGuessNew);
+    socket.on('chat:new', handleChatNew);
+    socket.on('session:end', handleSessionEnd);
+    socket.on('season:won', handleSeasonWon);
+    socket.on('player:disconnected', handlePlayerDisconnected);
+    socket.on('error' as any, handleError);
 
     return () => {
-      mounted = false;
-      if (startTimeoutId) clearTimeout(startTimeoutId);
-      clearInterval(checkReconnect);
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      socketRef.current?.disconnect();
-      socketRef.current = null;
+      socket.off('round:start', handleRoundStart);
+      socket.off('round:clue', handleRoundClue);
+      socket.off('round:won', handleRoundWon);
+      socket.off('round:timeout', handleRoundTimeout);
+      socket.off('guess:new', handleGuessNew);
+      socket.off('chat:new', handleChatNew);
+      socket.off('session:end', handleSessionEnd);
+      socket.off('season:won', handleSeasonWon);
+      socket.off('player:disconnected', handlePlayerDisconnected);
+      socket.off('error' as any, handleError);
+    };
+  }, [socket, startCountdown, stopTimer]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [lobbyId, initialRound, startCountdown, stopTimer]);
+  }, []);
+
+  // Helper for between-round countdown
+  function startBetweenRoundCountdown() {
+    setBetweenRoundCountdown(5);
+    let count = 5;
+    const iv = setInterval(() => {
+      count--;
+      setBetweenRoundCountdown(count);
+      if (count <= 0) clearInterval(iv);
+    }, 1000);
+  }
 
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
   function handleSubmitGuess(text: string) {
-    console.log('[GamePage] Submitting guess:', text, 'Socket connected:', socketRef.current?.connected);
-    socketRef.current?.emit('guess:submit', { text });
+    socket?.emit('guess:submit', { text });
   }
 
   function handleSubmitChat(text: string) {
-    socketRef.current?.emit('chat:message', { text });
+    socket?.emit('chat:message', { text });
   }
 
   // ---------------------------------------------------------------------------
@@ -380,35 +316,23 @@ export default function GamePage({ lobbyId, initialRound, onBack }: GamePageProp
   }
 
   // ---------------------------------------------------------------------------
-  // Reconnecting overlay
-  // ---------------------------------------------------------------------------
-
-  if (reconnecting) {
-    return (
-      <div style={styles.overlay}>
-        <div style={styles.overlayBox}>
-          <h2 style={{ margin: '0 0 8px', color: colors.textPrimary }}>Reconnecting…</h2>
-          <p style={{ color: colors.textSecondary, margin: 0 }}>
-            Trying to restore your connection. Please wait.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // ---------------------------------------------------------------------------
   // Disconnected
   // ---------------------------------------------------------------------------
 
-  if (phase === 'disconnected') {
+  if (!connected && phase !== 'session-end') {
     return (
       <div style={styles.wrapper}>
         <div style={styles.center}>
-          <h2 style={{ color: colors.textPrimary }}>Disconnected</h2>
-          <p style={{ color: colors.error, fontSize: 15 }}>
-            {socketError || 'Could not reconnect to the game server.'}
+          <h2 style={{ color: colors.textPrimary }}>Reconnecting…</h2>
+          <p style={{ color: colors.textSecondary, fontSize: 15 }}>
+            Trying to restore your connection. Please wait.
           </p>
-          <button onClick={onBack} style={styles.primaryBtn}>
+          {socketError && (
+            <p style={{ color: colors.error, fontSize: 14, marginTop: 12 }}>
+              {socketError}
+            </p>
+          )}
+          <button onClick={onBack} style={{ ...styles.primaryBtn, marginTop: 16 }}>
             Back to Lobbies
           </button>
         </div>
@@ -417,20 +341,18 @@ export default function GamePage({ lobbyId, initialRound, onBack }: GamePageProp
   }
 
   // ---------------------------------------------------------------------------
-  // Connecting / Waiting
+  // Waiting
   // ---------------------------------------------------------------------------
 
-  if (phase === 'connecting' || phase === 'waiting') {
+  if (phase === 'waiting') {
     return (
       <div style={styles.wrapper}>
         <div style={styles.center}>
           <h2 style={{ color: colors.textPrimary }}>🎬 Guess the GIF</h2>
           <p style={{ color: colors.textSecondary }}>
-            {phase === 'connecting'
-              ? 'Connecting to game…'
-              : betweenRoundCountdown > 0
-                ? `Next round in ${betweenRoundCountdown}s…`
-                : 'Waiting for the round to start…'}
+            {betweenRoundCountdown > 0
+              ? `Next round in ${betweenRoundCountdown}s…`
+              : 'Waiting for the round to start…'}
           </p>
           {socketError && (
             <p style={{ color: colors.error, fontSize: 14, marginTop: 12 }}>
@@ -697,25 +619,6 @@ const styles: Record<string, React.CSSProperties> = {
     ...commonStyles.primaryButton,
     display: 'block',
     marginTop: 12,
-  },
-  overlay: {
-    position: 'fixed' as const,
-    inset: 0,
-    background: 'rgba(15, 15, 35, 0.85)',
-    backdropFilter: 'blur(6px)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-    fontFamily: fonts.base,
-  },
-  overlayBox: {
-    background: colors.surface,
-    border: `1px solid ${colors.surfaceBorder}`,
-    borderRadius: radii.card,
-    padding: '32px 40px',
-    textAlign: 'center' as const,
-    boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
   },
   seasonBanner: {
     background: 'rgba(245, 158, 11, 0.15)',

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SocketProvider, useSocket } from './contexts/SocketContext';
 import { apiFetch } from './lib/api';
 import { colors, fonts } from './styles/theme';
 import LoginPage from './pages/LoginPage';
@@ -24,6 +25,7 @@ interface LobbyInfo {
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const { connectToLobby, disconnect } = useSocket();
   const [authPage, setAuthPage] = useState<AuthPage>('login');
   const [view, setView] = useState<AppView>('lobby-list');
   const [lobbyInfo, setLobbyInfo] = useState<LobbyInfo | null>(null);
@@ -51,14 +53,16 @@ function AppContent() {
     (lobbyId: string, joinCode: string, hostId: string) => {
       setLobbyInfo({ lobbyId, joinCode, hostId });
       setView('lobby');
+      connectToLobby(lobbyId);
     },
-    []
+    [connectToLobby]
   );
 
   const handleBackToList = useCallback(() => {
+    disconnect();
     setView('lobby-list');
     setLobbyInfo(null);
-  }, []);
+  }, [disconnect]);
 
   const handleGameStart = useCallback((_lobbyId: string, roundData: RoundStartData) => {
     setInitialRound(roundData);
@@ -146,7 +150,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <SocketProvider>
+        <AppContent />
+      </SocketProvider>
     </AuthProvider>
   );
 }

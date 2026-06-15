@@ -1,7 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '../lib/api';
-import { io as ioClient, Socket } from 'socket.io-client';
-import { supabase } from '../lib/supabase';
 import { colors, radii, commonStyles } from '../styles/theme';
 
 // ---------------------------------------------------------------------------
@@ -38,11 +36,7 @@ interface ArchivedSeasonLeaderboardResponse {
   entries: LeaderboardEntry[];
 }
 
-interface LeaderboardUpdateEntry {
-  rank: number;
-  username: string;
-  correctGuessCount: number;
-}
+
 
 // ---------------------------------------------------------------------------
 // Props
@@ -115,45 +109,6 @@ export default function LeaderboardPage({ onBack }: LeaderboardPageProps) {
     fetchCurrent();
     fetchArchivedSeasons();
   }, [fetchCurrent, fetchArchivedSeasons]);
-
-  // Socket.IO: listen for leaderboard:update
-  useEffect(() => {
-    let socket: Socket | null = null;
-
-    async function connect() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      socket = ioClient({
-        auth: { token: session?.access_token ?? '' },
-        transports: ['websocket', 'polling'],
-      });
-
-      socket.on('leaderboard:update', (payload: { entries: LeaderboardUpdateEntry[] }) => {
-        // Only update if we're viewing the current season
-        setSelectedSeasonId((current) => {
-          if (current === 'current') {
-            setCurrentEntries(
-              payload.entries.map((e) => ({
-                rank: e.rank,
-                playerId: '',
-                username: e.username,
-                correctGuessCount: e.correctGuessCount,
-              }))
-            );
-          }
-          return current;
-        });
-      });
-    }
-
-    connect();
-
-    return () => {
-      socket?.disconnect();
-    };
-  }, []);
 
   // Handle season dropdown change
   async function handleSeasonChange(value: string) {

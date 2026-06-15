@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { createSocket } from '../lib/socket';
+import { useEffect, useState, useCallback } from 'react';
+import { useSocket } from '../contexts/SocketContext';
 import { apiFetch } from '../lib/api';
 import { colors, radii, commonStyles } from '../styles/theme';
-import type { Socket } from 'socket.io-client';
 
 const BOT_PREFIXES = ['NoviceBot_', 'IntermediateBot_', 'ExpertBot_'];
 
@@ -38,70 +37,52 @@ export default function LobbyPage({
   onBack,
   onGameStart,
 }: LobbyPageProps) {
+  const { socket, connected } = useSocket();
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
-  const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [isHost, setIsHost] = useState(!hostId);
   const [copied, setCopied] = useState(false);
   const [botsAllowed, setBotsAllowed] = useState(true);
   const [togglingBots, setTogglingBots] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
 
-  const connectSocket = useCallback(async () => {
-    try {
-      const socket = await createSocket(lobbyId);
-      socketRef.current = socket;
-
-      socket.on('connect', () => {
-        setConnected(true);
-        setError('');
-      });
-
-      socket.on('disconnect', () => {
-        setConnected(false);
-      });
-
-      socket.on('lobby:update', (payload: { players: LobbyPlayer[]; hostSupabaseId?: string }) => {
-        setPlayers(payload.players);
-        if (payload.hostSupabaseId) {
-          setIsHost(payload.hostSupabaseId === currentUserId);
-        }
-      });
-
-      socket.on('round:start', (payload: { roundNumber: number; gifUrl: string }) => {
-        onGameStart(lobbyId, { roundNumber: payload.roundNumber, gifUrl: payload.gifUrl });
-      });
-
-      socket.on('connect_error', (err: Error) => {
-        setError(err.message || 'Connection failed');
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to connect');
-    }
-  }, [lobbyId, onGameStart, currentUserId]);
-
+  // Register event listeners on the shared socket
   useEffect(() => {
-    connectSocket();
+    if (!socket) return;
+
+    function handleLobbyUpdate(payload: { players: LobbyPlayer[]; hostSupabaseId?: string }) {
+      setPlayers(payload.players);
+      if (payload.hostSupabaseId) {
+        setIsHost(payload.hostSupabaseId === currentUserId);
+      }
+    }
+
+    function handleRoundStart(payload: { roundNumber: number; gifUrl: string }) {
+      onGameStart(lobbyId, { roundNumber: payload.roundNumber, gifUrl: payload.gifUrl });
+    }
+
+    function handleError(payload: { message?: string }) {
+      setError(payload.message ?? 'An error occurred');
+      setStarting(false);
+    }
+
+    socket.on('lobby:update', handleLobbyUpdate);
+    socket.on('round:start', handleRoundStart);
+    socket.on('error' as any, handleError);
 
     return () => {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
+      socket.off('lobby:update', handleLobbyUpdate);
+      socket.off('round:start', handleRoundStart);
+      socket.off('error' as any, handleError);
     };
-  }, [connectSocket]);
+  }, [socket, lobbyId, onGameStart, currentUserId]);
 
-  function handleStart() {
-    if (!socketRef.current) return;
+  const handleStart = useCallback(() => {
+    if (!socket) return;
     setStarting(true);
     setError('');
-    socketRef.current.emit('session:start', {});
-
-    // Listen for errors from the server
-    socketRef.current.once('error', (payload: { message?: string }) => {
-      setError(payload.message ?? 'Failed to start session');
-      setStarting(false);
-    });
-  }
+    socket.emit('session:start', {});
+  }, [socket]);
 
   function handleCopyCode() {
     navigator.clipboard.writeText(joinCode).then(() => {
