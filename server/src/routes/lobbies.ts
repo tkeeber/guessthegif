@@ -392,6 +392,35 @@ router.post('/:id/fill-bots', requireAuth, async (req: AuthenticatedRequest, res
       );
     }
 
+    // Broadcast lobby:update so the player list refreshes
+    const allPlayersResult = await pool.query(
+      `SELECT p.id AS player_id, p.username
+         FROM lobby_players lp
+         JOIN players p ON p.id = lp.player_id
+        WHERE lp.lobby_id = $1
+        ORDER BY lp.joined_at ASC`,
+      [id]
+    );
+
+    // Get host supabase_user_id for the client
+    const hostInfoResult = await pool.query(
+      `SELECT p.supabase_user_id FROM lobbies l JOIN players p ON p.id = l.host_id WHERE l.id = $1`,
+      [id]
+    );
+    const hostSupabaseId = hostInfoResult.rows[0]?.supabase_user_id ?? '';
+
+    // Import io from the server module isn't ideal in a route, so we use the app's io reference
+    const { io } = require('../index');
+    if (io) {
+      io.to(id).emit('lobby:update', {
+        players: allPlayersResult.rows.map((row: any) => ({
+          playerId: row.player_id,
+          username: row.username,
+        })),
+        hostSupabaseId,
+      });
+    }
+
     res.status(200).json({ success: true, botsAdded: botsResult.rows.length });
   } catch (error) {
     console.error('Fill bots error:', error);
