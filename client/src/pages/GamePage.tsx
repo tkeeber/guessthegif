@@ -156,6 +156,7 @@ export default function GamePage({ lobbyId, initialRound, onBack }: GamePageProp
 
         socket.on('connect', () => {
           if (!mounted) return;
+          console.log('[GamePage] Socket connected, id:', socket.id);
           setReconnecting(false);
           // If we were disconnected, we're back
           setPhase((prev) => (prev === 'disconnected' ? 'waiting' : prev));
@@ -359,6 +360,7 @@ export default function GamePage({ lobbyId, initialRound, onBack }: GamePageProp
   // ---------------------------------------------------------------------------
 
   function handleSubmitGuess(text: string) {
+    console.log('[GamePage] Submitting guess:', text, 'Socket connected:', socketRef.current?.connected);
     socketRef.current?.emit('guess:submit', { text });
   }
 

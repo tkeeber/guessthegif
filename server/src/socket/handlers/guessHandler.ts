@@ -21,6 +21,7 @@ export function registerGuessHandler(
     try {
       const playerId = socket.data.playerId;
       const text = payload.text;
+      console.log('[guess:submit] Received from player:', playerId, 'text:', text?.substring(0, 30));
 
       if (!text || typeof text !== 'string' || text.trim().length === 0) {
         const errorPayload: WSErrorPayload = {
