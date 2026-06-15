@@ -89,6 +89,8 @@ describe('Lobby Routes', () => {
     it('creates a lobby with a unique join code and adds host as first player', async () => {
       // Player lookup
       mockQuery.mockResolvedValueOnce({ rows: [{ id: 'player-1' }] });
+      // Remove from stale lobbies
+      mockQuery.mockResolvedValueOnce({ rowCount: 0 });
       // Join code uniqueness check
       mockQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -133,6 +135,8 @@ describe('Lobby Routes', () => {
     it('adds a player to an existing waiting lobby', async () => {
       // Player lookup
       mockQuery.mockResolvedValueOnce({ rows: [{ id: 'player-2' }] });
+      // Remove from stale lobbies
+      mockQuery.mockResolvedValueOnce({ rowCount: 0 });
       // Lobby lookup
       mockQuery.mockResolvedValueOnce({
         rows: [
@@ -161,6 +165,8 @@ describe('Lobby Routes', () => {
     it('returns 409 when lobby is in_session', async () => {
       // Player lookup
       mockQuery.mockResolvedValueOnce({ rows: [{ id: 'player-2' }] });
+      // Remove from stale lobbies
+      mockQuery.mockResolvedValueOnce({ rowCount: 0 });
       // Lobby lookup - in_session
       mockQuery.mockResolvedValueOnce({
         rows: [
@@ -185,6 +191,8 @@ describe('Lobby Routes', () => {
     it('returns 404 when lobby not found', async () => {
       // Player lookup
       mockQuery.mockResolvedValueOnce({ rows: [{ id: 'player-2' }] });
+      // Remove from stale lobbies
+      mockQuery.mockResolvedValueOnce({ rowCount: 0 });
       // Lobby lookup - not found
       mockQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -198,6 +206,8 @@ describe('Lobby Routes', () => {
     it('returns 200 if player is already in the lobby', async () => {
       // Player lookup
       mockQuery.mockResolvedValueOnce({ rows: [{ id: 'player-2' }] });
+      // Remove from stale lobbies
+      mockQuery.mockResolvedValueOnce({ rowCount: 0 });
       // Lobby lookup
       mockQuery.mockResolvedValueOnce({
         rows: [
@@ -223,6 +233,8 @@ describe('Lobby Routes', () => {
     it('returns 409 when lobby is closed', async () => {
       // Player lookup
       mockQuery.mockResolvedValueOnce({ rows: [{ id: 'player-2' }] });
+      // Remove from stale lobbies
+      mockQuery.mockResolvedValueOnce({ rowCount: 0 });
       // Lobby lookup - closed
       mockQuery.mockResolvedValueOnce({
         rows: [

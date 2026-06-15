@@ -318,4 +318,85 @@ router.patch('/:id/bots-allowed', requireAuth, async (req: AuthenticatedRequest,
   }
 });
 
+// POST /api/lobbies/:id/fill-bots
+// Instantly fill a lobby with bots (up to 5 total players). Host only.
+router.post('/:id/fill-bots', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'unauthorized', message: 'Not authenticated' });
+      return;
+    }
+
+    const { id } = req.params;
+
+    // Look up the player record
+    const playerResult = await pool.query(
+      'SELECT id FROM players WHERE supabase_user_id = $1',
+      [req.user.id]
+    );
+    if (playerResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found', message: 'Player profile not found' });
+      return;
+    }
+    const playerId = playerResult.rows[0].id;
+
+    // Fetch the lobby
+    const lobbyResult = await pool.query('SELECT * FROM lobbies WHERE id = $1', [id]);
+    if (lobbyResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found', message: 'Lobby not found' });
+      return;
+    }
+    const lobby = lobbyResult.rows[0];
+
+    if (lobby.host_id !== playerId) {
+      res.status(403).json({ error: 'forbidden', message: 'Only the host can fill with bots' });
+      return;
+    }
+    if (lobby.status !== 'waiting') {
+      res.status(409).json({ error: 'conflict', message: 'Lobby is not in waiting state' });
+      return;
+    }
+
+    // Count current players
+    const countResult = await pool.query(
+      'SELECT COUNT(*)::int AS count FROM lobby_players WHERE lobby_id = $1',
+      [id]
+    );
+    const currentCount = countResult.rows[0].count;
+    const botsNeeded = Math.max(0, 5 - currentCount);
+
+    if (botsNeeded === 0) {
+      res.status(200).json({ success: true, botsAdded: 0, message: 'Lobby is already full' });
+      return;
+    }
+
+    // Get available bot player records
+    const botsResult = await pool.query(
+      `SELECT id, username FROM players
+        WHERE is_bot = true
+          AND id NOT IN (SELECT player_id FROM lobby_players WHERE lobby_id = $1)
+        LIMIT $2`,
+      [id, botsNeeded]
+    );
+
+    if (botsResult.rows.length === 0) {
+      res.status(400).json({ error: 'no_bots', message: 'No bot players available. Run the bot pool seed migration first.' });
+      return;
+    }
+
+    // Add bots to lobby_players
+    for (const bot of botsResult.rows) {
+      await pool.query(
+        'INSERT INTO lobby_players (lobby_id, player_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [id, bot.id]
+      );
+    }
+
+    res.status(200).json({ success: true, botsAdded: botsResult.rows.length });
+  } catch (error) {
+    console.error('Fill bots error:', error);
+    res.status(500).json({ error: 'server_error', message: 'Internal server error' });
+  }
+});
+
 export default router;

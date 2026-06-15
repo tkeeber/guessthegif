@@ -45,6 +45,7 @@ export default function LobbyPage({
   const [copied, setCopied] = useState(false);
   const [botsAllowed, setBotsAllowed] = useState(true);
   const [togglingBots, setTogglingBots] = useState(false);
+  const [fillingBots, setFillingBots] = useState(false);
 
   // Register event listeners on the shared socket
   useEffect(() => {
@@ -103,11 +104,22 @@ export default function LobbyPage({
         body: JSON.stringify({ botsAllowed: newValue }),
       });
     } catch (err) {
-      // Revert on failure
       setBotsAllowed(!newValue);
       setError(err instanceof Error ? err.message : 'Failed to toggle bots');
     } finally {
       setTogglingBots(false);
+    }
+  }
+
+  async function handleFillBots() {
+    setFillingBots(true);
+    setError('');
+    try {
+      await apiFetch(`/api/lobbies/${lobbyId}/fill-bots`, { method: 'POST' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add bots');
+    } finally {
+      setFillingBots(false);
     }
   }
 
@@ -191,6 +203,9 @@ export default function LobbyPage({
               />
               <span>🤖 Allow Bots</span>
             </label>
+            <button onClick={handleFillBots} disabled={fillingBots} style={styles.fillBotsBtn}>
+              {fillingBots ? 'Adding…' : '🤖 Fill with Bots'}
+            </button>
           </div>
         )}
 
@@ -381,5 +396,16 @@ const styles: Record<string, React.CSSProperties> = {
     height: 18,
     cursor: 'pointer',
     accentColor: colors.primary,
+  },
+  fillBotsBtn: {
+    padding: '8px 14px',
+    fontSize: 13,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: 'none',
+    background: colors.primary,
+    color: '#fff',
+    cursor: 'pointer',
+    marginLeft: 'auto',
   },
 };

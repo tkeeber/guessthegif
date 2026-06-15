@@ -43,6 +43,7 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
   const [botsAllowed, setBotsAllowed] = useState(true);
   const [playerRank, setPlayerRank] = useState<number | null>(null);
   const [playerPoints, setPlayerPoints] = useState<number | null>(null);
+  const [playerUsername, setPlayerUsername] = useState<string>('');
 
   async function fetchLobbies() {
     try {
@@ -64,6 +65,7 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
       .then((data) => {
         // Find current player's entry by fetching their profile first
         apiFetch<{ player: { username: string } }>('/api/auth/me').then((profile) => {
+          setPlayerUsername(profile.player.username);
           const myEntry = data.entries.find((e) => e.username === profile.player.username);
           if (myEntry) {
             setPlayerRank(myEntry.rank);
@@ -170,17 +172,6 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
           >
             {creating ? 'Creating…' : 'Create Lobby'}
           </button>
-          <button
-            onClick={() => {/* handled by join code section */}}
-            disabled
-            style={{
-              ...styles.actionBtn,
-              opacity: 0.5,
-              cursor: 'default',
-            }}
-          >
-            Join Lobby
-          </button>
         </div>
 
         {/* Join with code */}
@@ -229,7 +220,9 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
               {lobbies.map((lobby) => (
                 <li key={lobby.id} style={styles.lobbyCard}>
                   <div style={styles.lobbyInfo}>
-                    <span style={styles.lobbyName}>{lobby.hostUsername}&apos;s lobby</span>
+                    <span style={styles.lobbyName}>
+                      {lobby.hostUsername === playerUsername ? '⭐ Your lobby' : `${lobby.hostUsername}'s lobby`}
+                    </span>
                     <span style={styles.playerCount}>
                       {lobby.playerCount} player{lobby.playerCount !== 1 ? 's' : ''}
                       {lobby.botsAllowed && <span style={styles.botIndicator}> 🤖</span>}
