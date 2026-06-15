@@ -71,7 +71,7 @@ interface RoundResult {
 
 interface GamePageProps {
   lobbyId: string;
-  initialRound?: { roundNumber: number; gifUrl: string } | null;
+  initialRound?: { roundNumber: number; gifUrl: string; players?: { playerId: string; username: string }[] } | null;
   onBack: () => void;
 }
 
@@ -523,6 +523,22 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
           onSubmit={handleSubmitGuess}
           disabled={!isRoundActive}
         />
+
+        {/* Player list */}
+        {initialRound?.players && initialRound.players.length > 0 && (
+          <div style={styles.playerListSection}>
+            <span style={styles.playerListTitle}>Players</span>
+            <div style={styles.playerChips}>
+              {initialRound.players.map((p) => (
+                <span key={p.playerId} style={styles.playerChip}>
+                  {p.username.startsWith('NoviceBot_') || p.username.startsWith('IntermediateBot_') || p.username.startsWith('ExpertBot_')
+                    ? `🤖 ${p.username}`
+                    : p.username}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -729,5 +745,34 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     color: colors.textSecondary,
     cursor: 'pointer',
+  },
+  playerListSection: {
+    marginTop: 12,
+    padding: '10px 14px',
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.button,
+  },
+  playerListTitle: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: colors.textMuted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 1,
+    marginBottom: 8,
+    display: 'block',
+  },
+  playerChips: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: 6,
+  },
+  playerChip: {
+    fontSize: 13,
+    padding: '4px 10px',
+    borderRadius: 12,
+    background: colors.inputBg,
+    border: `1px solid ${colors.inputBorder}`,
+    color: colors.textSecondary,
   },
 };

@@ -17,6 +17,7 @@ interface LobbyPlayer {
 export interface RoundStartData {
   roundNumber: number;
   gifUrl: string;
+  players: { playerId: string; username: string }[];
 }
 
 interface LobbyPageProps {
@@ -59,7 +60,7 @@ export default function LobbyPage({
     }
 
     function handleRoundStart(payload: { roundNumber: number; gifUrl: string }) {
-      onGameStart(lobbyId, { roundNumber: payload.roundNumber, gifUrl: payload.gifUrl });
+      onGameStart(lobbyId, { roundNumber: payload.roundNumber, gifUrl: payload.gifUrl, players });
     }
 
     function handleError(payload: { message?: string }) {
