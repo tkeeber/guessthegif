@@ -15,6 +15,11 @@ interface LobbyPlayer {
   username: string;
 }
 
+export interface RoundStartData {
+  roundNumber: number;
+  gifUrl: string;
+}
+
 interface LobbyPageProps {
   lobbyId: string;
   joinCode: string;
@@ -22,7 +27,7 @@ interface LobbyPageProps {
   hostId: string;
   currentUserId: string;
   onBack: () => void;
-  onGameStart: (lobbyId: string) => void;
+  onGameStart: (lobbyId: string, initialRound: RoundStartData) => void;
 }
 
 export default function LobbyPage({
@@ -64,8 +69,8 @@ export default function LobbyPage({
         }
       });
 
-      socket.on('round:start', () => {
-        onGameStart(lobbyId);
+      socket.on('round:start', (payload: { roundNumber: number; gifUrl: string }) => {
+        onGameStart(lobbyId, { roundNumber: payload.roundNumber, gifUrl: payload.gifUrl });
       });
 
       socket.on('connect_error', (err: Error) => {

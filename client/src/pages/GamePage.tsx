@@ -73,6 +73,7 @@ interface RoundResult {
 
 interface GamePageProps {
   lobbyId: string;
+  initialRound?: { roundNumber: number; gifUrl: string } | null;
   onBack: () => void;
 }
 
@@ -82,10 +83,11 @@ interface GamePageProps {
 
 let feedIdCounter = 0;
 
-export default function GamePage({ lobbyId, onBack }: GamePageProps) {
+export default function GamePage({ lobbyId, initialRound, onBack }: GamePageProps) {
   const socketRef = useRef<Socket | null>(null);
   const [phase, setPhase] = useState<GamePhase>('connecting');
   const [reconnecting, setReconnecting] = useState(false);
+  const [socketError, setSocketError] = useState('');
 
   // Round state
   const [roundNumber, setRoundNumber] = useState(0);
@@ -144,6 +146,7 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
 
   useEffect(() => {
     let mounted = true;
+    let startTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     async function connect() {
       try {
@@ -168,10 +171,18 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
           setReconnecting(true);
         });
 
+        // Listen for error events from server
+        socket.on('error' as any, (payload: { code?: string; message?: string }) => {
+          if (!mounted) return;
+          setSocketError(payload.message ?? 'An error occurred');
+        });
+
         // --- Game events ---
 
         socket.on('round:start', (payload: RoundStartPayload) => {
           if (!mounted) return;
+          // Clear the start timeout since we got a round
+          if (startTimeoutId) { clearTimeout(startTimeoutId); startTimeoutId = null; }
           setPhase('active');
           setRoundNumber(payload.roundNumber);
           setGifUrl(payload.gifUrl);
@@ -266,8 +277,32 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
           }, 4000);
         });
 
-        // Connection established — wait for round:start
-        setPhase('waiting');
+        // If we have initial round data (passed from LobbyPage), use it immediately
+        if (initialRound) {
+          setPhase('active');
+          setRoundNumber(initialRound.roundNumber);
+          setGifUrl(initialRound.gifUrl);
+          setClue(null);
+          setRoundResult(null);
+          setFeedEntries([]);
+          setBetweenRoundCountdown(0);
+          clueReceivedRef.current = false;
+          roundStartTimeRef.current = Date.now();
+          startCountdown(120);
+        } else {
+          // Connection established — wait for round:start with a 15s timeout
+          setPhase('waiting');
+          startTimeoutId = setTimeout(() => {
+            if (!mounted) return;
+            setPhase((currentPhase) => {
+              if (currentPhase === 'waiting') {
+                setSocketError('Failed to start session. Please go back and try again.');
+                return 'disconnected';
+              }
+              return currentPhase;
+            });
+          }, 15_000);
+        }
       } catch {
         if (mounted) setPhase('disconnected');
       }
@@ -310,13 +345,14 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
 
     return () => {
       mounted = false;
+      if (startTimeoutId) clearTimeout(startTimeoutId);
       clearInterval(checkReconnect);
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       socketRef.current?.disconnect();
       socketRef.current = null;
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [lobbyId, startCountdown, stopTimer]);
+  }, [lobbyId, initialRound, startCountdown, stopTimer]);
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -366,8 +402,8 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
       <div style={styles.wrapper}>
         <div style={styles.center}>
           <h2 style={{ color: colors.textPrimary }}>Disconnected</h2>
-          <p style={{ color: colors.textSecondary }}>
-            Could not reconnect to the game server.
+          <p style={{ color: colors.error, fontSize: 15 }}>
+            {socketError || 'Could not reconnect to the game server.'}
           </p>
           <button onClick={onBack} style={styles.primaryBtn}>
             Back to Lobbies
@@ -393,6 +429,16 @@ export default function GamePage({ lobbyId, onBack }: GamePageProps) {
                 ? `Next round in ${betweenRoundCountdown}s…`
                 : 'Waiting for the round to start…'}
           </p>
+          {socketError && (
+            <p style={{ color: colors.error, fontSize: 14, marginTop: 12 }}>
+              {socketError}
+            </p>
+          )}
+          {socketError && (
+            <button onClick={onBack} style={{ ...styles.primaryBtn, marginTop: 12 }}>
+              Back to Lobbies
+            </button>
+          )}
         </div>
       </div>
     );

@@ -49,6 +49,7 @@ export function registerSessionHandler(
       await startFirstRound(io, result.session.id, lobbyId);
     } catch (error) {
       if (error instanceof SessionError) {
+        console.log('[session:start] Error:', error.code, error.message);
         const errorPayload: WSErrorPayload = {
           code: error.code,
           message: error.message,
@@ -56,7 +57,7 @@ export function registerSessionHandler(
         };
         socket.emit('error' as any, errorPayload);
       } else {
-        console.error('session:start error:', error);
+        console.error('[session:start] Unexpected error:', error);
         const errorPayload: WSErrorPayload = {
           code: 'server_error',
           message: 'An unexpected error occurred.',

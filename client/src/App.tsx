@@ -4,13 +4,16 @@ import { apiFetch } from './lib/api';
 import { colors, fonts } from './styles/theme';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import LobbyListPage from './pages/LobbyListPage';
 import LobbyPage from './pages/LobbyPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
 import GamePage from './pages/GamePage';
+import type { RoundStartData } from './pages/LobbyPage';
 
-type AuthPage = 'login' | 'signup';
+type AuthPage = 'login' | 'signup' | 'forgot-password';
 type AppView = 'lobby-list' | 'lobby' | 'game' | 'leaderboard' | 'admin';
 
 interface LobbyInfo {
@@ -24,7 +27,17 @@ function AppContent() {
   const [authPage, setAuthPage] = useState<AuthPage>('login');
   const [view, setView] = useState<AppView>('lobby-list');
   const [lobbyInfo, setLobbyInfo] = useState<LobbyInfo | null>(null);
+  const [initialRound, setInitialRound] = useState<RoundStartData | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+
+  // Detect Supabase recovery token in URL hash on mount
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setShowResetPassword(true);
+    }
+  }, []);
 
   // Check admin status when user is authenticated
   useEffect(() => {
@@ -47,7 +60,8 @@ function AppContent() {
     setLobbyInfo(null);
   }, []);
 
-  const handleGameStart = useCallback((_lobbyId: string) => {
+  const handleGameStart = useCallback((_lobbyId: string, roundData: RoundStartData) => {
+    setInitialRound(roundData);
     setView('game');
   }, []);
 
@@ -67,11 +81,31 @@ function AppContent() {
     );
   }
 
+  // Show reset password page when recovery token is detected
+  if (showResetPassword) {
+    return (
+      <ResetPasswordPage
+        onComplete={() => {
+          setShowResetPassword(false);
+          setView('lobby-list');
+        }}
+      />
+    );
+  }
+
   if (!user) {
     if (authPage === 'signup') {
       return <SignupPage onNavigateLogin={() => setAuthPage('login')} />;
     }
-    return <LoginPage onNavigateSignup={() => setAuthPage('signup')} />;
+    if (authPage === 'forgot-password') {
+      return <ForgotPasswordPage onNavigateLogin={() => setAuthPage('login')} />;
+    }
+    return (
+      <LoginPage
+        onNavigateSignup={() => setAuthPage('signup')}
+        onNavigateForgotPassword={() => setAuthPage('forgot-password')}
+      />
+    );
   }
 
   // Authenticated views
@@ -100,6 +134,7 @@ function AppContent() {
     return (
       <GamePage
         lobbyId={lobbyInfo.lobbyId}
+        initialRound={initialRound}
         onBack={handleBackToList}
       />
     );

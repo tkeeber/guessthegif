@@ -1,24 +1,23 @@
 import { useState, type FormEvent } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { colors, radii, fonts, commonStyles } from '../styles/theme';
 
-interface LoginPageProps {
-  onNavigateSignup: () => void;
-  onNavigateForgotPassword: () => void;
+interface ResetPasswordPageProps {
+  onComplete: () => void;
 }
 
-export default function LoginPage({ onNavigateSignup, onNavigateForgotPassword }: LoginPageProps) {
-  const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
+export default function ResetPasswordPage({ onComplete }: ResetPasswordPageProps) {
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState<{ password?: string; confirm?: string; form?: string }>({});
   const [submitting, setSubmitting] = useState(false);
 
   function validate(): boolean {
     const next: typeof errors = {};
-    if (!email.trim()) next.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) next.email = 'Enter a valid email';
     if (!password) next.password = 'Password is required';
+    else if (password.length < 6) next.password = 'Password must be at least 6 characters';
+    if (!confirmPassword) next.confirm = 'Please confirm your password';
+    else if (password !== confirmPassword) next.confirm = 'Passwords do not match';
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -26,14 +25,19 @@ export default function LoginPage({ onNavigateSignup, onNavigateForgotPassword }
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!validate()) return;
+
     setSubmitting(true);
     setErrors({});
 
-    const { error } = await signIn(email, password);
+    const { error } = await supabase.auth.updateUser({ password });
     setSubmitting(false);
 
     if (error) {
-      setErrors({ form: 'Invalid credentials.' });
+      setErrors({ form: error.message || 'Failed to update password. Please try again.' });
+    } else {
+      // Clear the hash so the app doesn't re-render this page
+      window.location.hash = '';
+      onComplete();
     }
   }
 
@@ -43,37 +47,38 @@ export default function LoginPage({ onNavigateSignup, onNavigateForgotPassword }
         {/* Logo */}
         <div style={styles.logoSection}>
           <h1 style={styles.logo}>GUESS THE GIF</h1>
-          <p style={styles.tagline}>Eat my GIFS Jeff</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={styles.form} noValidate>
-          <h2 style={styles.formTitle}>Sign In</h2>
+          <h2 style={styles.formTitle}>Set New Password</h2>
+
+          <p style={styles.description}>Enter your new password below.</p>
 
           <label style={styles.label}>
-            <span style={styles.labelText}>Email</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={styles.input}
-              autoComplete="email"
-              placeholder="you@example.com"
-            />
-            {errors.email && <span style={styles.error}>{errors.email}</span>}
-          </label>
-
-          <label style={styles.label}>
-            <span style={styles.labelText}>Password</span>
+            <span style={styles.labelText}>New Password</span>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={styles.input}
-              autoComplete="current-password"
+              autoComplete="new-password"
               placeholder="••••••••"
             />
             {errors.password && <span style={styles.error}>{errors.password}</span>}
+          </label>
+
+          <label style={styles.label}>
+            <span style={styles.labelText}>Confirm Password</span>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              style={styles.input}
+              autoComplete="new-password"
+              placeholder="••••••••"
+            />
+            {errors.confirm && <span style={styles.error}>{errors.confirm}</span>}
           </label>
 
           {errors.form && <p style={styles.formError}>{errors.form}</p>}
@@ -86,21 +91,8 @@ export default function LoginPage({ onNavigateSignup, onNavigateForgotPassword }
               opacity: submitting ? 0.7 : 1,
             }}
           >
-            {submitting ? 'Signing in…' : 'Sign In'}
+            {submitting ? 'Updating…' : 'Update Password'}
           </button>
-
-          <p style={styles.forgotText}>
-            <button type="button" onClick={onNavigateForgotPassword} style={styles.linkBtn}>
-              Forgot password?
-            </button>
-          </p>
-
-          <p style={styles.switchText}>
-            Don&apos;t have an account?{' '}
-            <button type="button" onClick={onNavigateSignup} style={styles.linkBtn}>
-              Sign up
-            </button>
-          </p>
         </form>
       </div>
     </div>
@@ -130,18 +122,13 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
   logo: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 900,
     letterSpacing: 2,
     margin: 0,
     background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
-  },
-  tagline: {
-    color: colors.textSecondary,
-    fontSize: 16,
-    margin: '8px 0 0',
   },
   form: {
     width: '100%',
@@ -159,6 +146,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     textAlign: 'center',
     color: colors.textPrimary,
+  },
+  description: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    margin: 0,
   },
   label: {
     display: 'flex',
@@ -184,20 +177,5 @@ const styles: Record<string, React.CSSProperties> = {
   submitBtn: {
     ...commonStyles.primaryButton,
     marginTop: 4,
-  },
-  switchText: {
-    textAlign: 'center',
-    fontSize: 14,
-    color: colors.textSecondary,
-    margin: 0,
-  },
-  forgotText: {
-    textAlign: 'center',
-    fontSize: 13,
-    color: colors.textSecondary,
-    margin: 0,
-  },
-  linkBtn: {
-    ...commonStyles.linkButton,
   },
 };
