@@ -11,9 +11,13 @@ export function registerSessionHandler(
   io: TypedServer,
   socket: AuthenticatedSocket
 ): void {
-  socket.on('session:start', async (_payload: SessionStartPayload) => {
+  socket.on('session:start', async (payload: SessionStartPayload) => {
     console.log('[session:start] Received from player:', socket.data.playerId);
     console.log('[session:start] Socket rooms:', Array.from(socket.rooms));
+
+    // Extract config with defaults
+    const timePerGif = payload.timePerGif ?? 60;
+    const numGifs = payload.numGifs ?? 3;
 
     try {
       const playerId = socket.data.playerId;
@@ -45,12 +49,12 @@ export function registerSessionHandler(
 
       // Start the session (validates players, GIFs, creates session + rounds)
       console.log('[session:start] Calling startSession...');
-      const result = await startSession(lobbyId, playerId);
+      const result = await startSession(lobbyId, playerId, numGifs, timePerGif);
       console.log('[session:start] Session created:', result.session.id, 'with', result.rounds.length, 'rounds');
 
       // Use the orchestrator to start the first round
       console.log('[session:start] Calling startFirstRound...');
-      await startFirstRound(io, result.session.id, lobbyId);
+      await startFirstRound(io, result.session.id, lobbyId, timePerGif * 1000, numGifs);
       console.log('[session:start] First round started successfully');
 
     } catch (error) {

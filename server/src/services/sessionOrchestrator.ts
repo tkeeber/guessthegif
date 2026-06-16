@@ -18,7 +18,15 @@ import { checkForSeasonWinner, endSeason } from './seasonManager';
 // Constants
 // ---------------------------------------------------------------------------
 const BETWEEN_ROUND_DELAY_MS = 5_000; // 5 seconds between rounds
-const TOTAL_ROUNDS = 3;
+
+// ---------------------------------------------------------------------------
+// Per-session config — stores timePerGifMs and totalRounds set at session start
+// ---------------------------------------------------------------------------
+interface SessionConfig {
+  timePerGifMs: number;
+  totalRounds: number;
+}
+const sessionConfigs = new Map<string, SessionConfig>();
 
 // ---------------------------------------------------------------------------
 // Active delay timers — keyed by session ID so they can be cleared if needed
@@ -49,13 +57,18 @@ export async function onRoundEnd(
 
   const rounds = roundsResult.rows;
 
+  // Look up this session's config (total rounds)
+  const config = sessionConfigs.get(sessionId);
+  const totalRounds = config?.totalRounds ?? 3;
+  const timePerGifMs = config?.timePerGifMs ?? 60_000;
+
   // Count completed rounds (won or timeout)
   const completedRounds = rounds.filter(
     (r: any) =>
       r.status === RoundStatus.Won || r.status === RoundStatus.Timeout
   );
 
-  if (completedRounds.length >= TOTAL_ROUNDS) {
+  if (completedRounds.length >= totalRounds) {
     // All rounds done — end the session
     await endSession(io, sessionId, lobbyId);
     return;
@@ -76,7 +89,7 @@ export async function onRoundEnd(
   const timer = setTimeout(async () => {
     sessionTimers.delete(sessionId);
     try {
-      await startRound(io, nextRound.id, lobbyId);
+      await startRound(io, nextRound.id, lobbyId, timePerGifMs / 1000);
     } catch (err) {
       console.error('Error starting next round:', err);
     }
@@ -87,13 +100,19 @@ export async function onRoundEnd(
 
 /**
  * Start the first round of a session. Called from the session handler
- * when the host starts the session.
+ * when the host starts the session. Stores timePerGifMs and totalRounds
+ * for subsequent rounds.
  */
 export async function startFirstRound(
   io: TypedServer,
   sessionId: string,
-  lobbyId: string
+  lobbyId: string,
+  timePerGifMs: number = 60_000,
+  totalRounds: number = 3
 ): Promise<void> {
+  // Store session config for use in subsequent rounds
+  sessionConfigs.set(sessionId, { timePerGifMs, totalRounds });
+
   // Fetch the first round (round_number = 1)
   const roundResult = await pool.query(
     `SELECT id FROM rounds
@@ -105,7 +124,7 @@ export async function startFirstRound(
     throw new Error('No rounds found for session.');
   }
 
-  await startRound(io, roundResult.rows[0].id, lobbyId);
+  await startRound(io, roundResult.rows[0].id, lobbyId, timePerGifMs / 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +140,9 @@ async function endSession(
   sessionId: string,
   lobbyId: string
 ): Promise<void> {
+  // Clean up session config
+  sessionConfigs.delete(sessionId);
+
   // Generate session summary — count correct guesses per player across all rounds
   const summary = await generateSessionSummary(sessionId);
 
@@ -229,4 +251,5 @@ export function clearAllSessionTimers(): void {
     clearTimeout(timer);
   }
   sessionTimers.clear();
+  sessionConfigs.clear();
 }

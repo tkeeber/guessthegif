@@ -12,8 +12,10 @@ export interface ChatMessagePayload {
   text: string;
 }
 
-// session:start has an empty payload
-export type SessionStartPayload = Record<string, never>;
+export interface SessionStartPayload {
+  timePerGif?: number; // seconds, default 60, min 10, max 300
+  numGifs?: number;    // must be one of [3, 5, 10], default 3
+}
 
 export interface ClientToServerEvents {
   'guess:submit': (payload: GuessSubmitPayload) => void;

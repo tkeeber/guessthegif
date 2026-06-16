@@ -7,27 +7,53 @@ export interface SessionCreateResult {
   session: Session;
   rounds: Round[];
   firstRoundGifUrl: string;
+  gifDurationSeconds: number;
+  roundsPerSession: number;
 }
 
+const VALID_NUM_GIFS = [3, 5, 10] as const;
+const TIME_PER_GIF_MIN = 10;
+const TIME_PER_GIF_MAX = 300;
+
 /**
- * Validates that a lobby can start a session and creates the session with 3 rounds.
+ * Validates that a lobby can start a session and creates the session with the
+ * specified number of rounds.
  *
  * Validation:
  * - Lobby must exist
  * - Requesting user must be the host
  * - Lobby must have ≥ 2 players
- * - GIF library must have ≥ 3 active GIFs
+ * - GIF library must have ≥ numGifs active GIFs
+ * - numGifs must be one of [3, 5, 10]
+ * - timePerGif must be between 10 and 300 (seconds)
  *
  * Creates:
  * - Gets or creates the current active season
  * - Session record linked to lobby and season
- * - 3 Round records with distinct random GIFs
+ * - numGifs Round records with distinct random GIFs
  * - Updates lobby status to 'in_session'
  */
 export async function startSession(
   lobbyId: string,
-  hostPlayerId: string
+  hostPlayerId: string,
+  numGifs: number = 3,
+  timePerGif: number = 60
 ): Promise<SessionCreateResult> {
+  // Validate numGifs
+  if (!(VALID_NUM_GIFS as readonly number[]).includes(numGifs)) {
+    throw new SessionError(
+      'invalid_config',
+      `numGifs must be one of ${VALID_NUM_GIFS.join(', ')}.`
+    );
+  }
+
+  // Validate timePerGif
+  if (timePerGif < TIME_PER_GIF_MIN || timePerGif > TIME_PER_GIF_MAX) {
+    throw new SessionError(
+      'invalid_config',
+      `timePerGif must be between ${TIME_PER_GIF_MIN} and ${TIME_PER_GIF_MAX} seconds.`
+    );
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -66,12 +92,13 @@ export async function startSession(
       );
     }
 
-    // 3. Validate ≥ 3 active GIFs and select 3 distinct random ones
+    // 3. Validate enough active GIFs and select distinct random ones
     const gifsResult = await client.query(
-      'SELECT * FROM gifs WHERE is_active = true ORDER BY RANDOM() LIMIT 3'
+      'SELECT * FROM gifs WHERE is_active = true ORDER BY RANDOM() LIMIT $1',
+      [numGifs]
     );
 
-    if (gifsResult.rows.length < 3) {
+    if (gifsResult.rows.length < numGifs) {
       throw new SessionError(
         'insufficient_gifs',
         'Not enough GIFs in the library to start a session.'
@@ -93,9 +120,9 @@ export async function startSession(
 
     const session: Session = sessionResult.rows[0];
 
-    // 6. Create 3 Round records (round_number 1-3)
+    // 6. Create numGifs Round records
     const rounds: Round[] = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < numGifs; i++) {
       const roundResult = await client.query(
         `INSERT INTO rounds (session_id, gif_id, round_number, status)
          VALUES ($1, $2, $3, $4)
@@ -117,6 +144,8 @@ export async function startSession(
       session,
       rounds,
       firstRoundGifUrl: selectedGifs[0].gif_url,
+      gifDurationSeconds: timePerGif,
+      roundsPerSession: numGifs,
     };
   } catch (error) {
     await client.query('ROLLBACK');

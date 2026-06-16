@@ -66,6 +66,8 @@ export default function LobbyPage({
   const [rankMap, setRankMap] = useState<Record<string, number>>({});
   const [hostUsername, setHostUsername] = useState<string>('');
   const [createdAt, setCreatedAt] = useState<string>('');
+  const [timePerGif, setTimePerGif] = useState<number>(60);
+  const [numGifs, setNumGifs] = useState<number>(3);
 
   // Fetch leaderboard on mount to build username → rank map
   useEffect(() => {
@@ -132,8 +134,8 @@ export default function LobbyPage({
     if (!socket) return;
     setStarting(true);
     setError('');
-    socket.emit('session:start', {});
-  }, [socket]);
+    socket.emit('session:start', { timePerGif, numGifs });
+  }, [socket, timePerGif, numGifs]);
 
   function handleCopyCode() {
     navigator.clipboard.writeText(joinCode).then(() => {
@@ -255,6 +257,50 @@ export default function LobbyPage({
         </div>
 
         {/* Host controls */}
+
+        {isHost && (
+          <div style={styles.configSection}>
+            <h2 style={styles.sectionTitle}>⚙️ Game Settings</h2>
+
+            {/* Time per GIF */}
+            <div style={styles.configRow}>
+              <label style={styles.configLabel} htmlFor="time-per-gif">
+                ⏱ Time per GIF: <strong style={{ color: colors.secondary }}>{timePerGif}s</strong>
+              </label>
+              <input
+                id="time-per-gif"
+                type="range"
+                min={10}
+                max={300}
+                step={10}
+                value={timePerGif}
+                onChange={(e) => setTimePerGif(Number(e.target.value))}
+                style={styles.slider}
+              />
+              <div style={styles.sliderRange}>
+                <span style={styles.sliderMin}>10s</span>
+                <span style={styles.sliderMax}>300s</span>
+              </div>
+            </div>
+
+            {/* Number of GIFs */}
+            <div style={styles.configRow}>
+              <label style={styles.configLabel} htmlFor="num-gifs">
+                🎬 Number of GIFs
+              </label>
+              <select
+                id="num-gifs"
+                value={numGifs}
+                onChange={(e) => setNumGifs(Number(e.target.value))}
+                style={styles.select}
+              >
+                <option value={3}>3 rounds</option>
+                <option value={5}>5 rounds</option>
+                <option value={10}>10 rounds</option>
+              </select>
+            </div>
+          </div>
+        )}
 
         {isHost && (
           <button
@@ -559,5 +605,51 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     color: colors.textSecondary,
     cursor: 'pointer',
+  },
+  configSection: {
+    marginBottom: 20,
+    padding: '16px',
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+  },
+  configRow: {
+    marginBottom: 16,
+  },
+  configLabel: {
+    display: 'block',
+    fontSize: 14,
+    fontWeight: 500,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  slider: {
+    width: '100%',
+    accentColor: colors.primary,
+    cursor: 'pointer',
+  },
+  sliderRange: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  sliderMin: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  sliderMax: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  select: {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: 15,
+    borderRadius: radii.input,
+    border: `1px solid ${colors.inputBorder}`,
+    background: colors.inputBg,
+    color: colors.textPrimary,
+    cursor: 'pointer',
+    outline: 'none',
   },
 };

@@ -16,7 +16,6 @@ import { onRoundEnd } from './sessionOrchestrator';
 // ---------------------------------------------------------------------------
 // Timer constants (in milliseconds)
 // ---------------------------------------------------------------------------
-const INITIAL_TIMER_MS = 120_000; // 120 seconds before clue
 const POST_CLUE_TIMER_MS = 60_000; // 60 seconds after clue
 
 // ---------------------------------------------------------------------------
@@ -52,12 +51,13 @@ function clearRoundTimer(roundId: string): void {
 /**
  * Start a round: set status to active, record start time, broadcast
  * `round:start` to all players in the session room, and kick off the
- * 120-second initial timer.
+ * initial timer (defaults to 60 seconds if not specified).
  */
 export async function startRound(
   io: TypedServer,
   roundId: string,
-  lobbyId: string
+  lobbyId: string,
+  durationSeconds: number = 60
 ): Promise<Round> {
   const result = await pool.query(
     `UPDATE rounds
@@ -86,12 +86,13 @@ export async function startRound(
     gifUrl,
   });
 
-  // Schedule the 120-second clue timer
+  // Schedule the initial timer before the clue phase
+  const initialTimerMs = durationSeconds * 1000;
   const timer = setTimeout(() => {
     handleCluePhase(io, roundId, lobbyId).catch((err) =>
       console.error('Clue phase error:', err)
     );
-  }, INITIAL_TIMER_MS);
+  }, initialTimerMs);
   roundTimers.set(roundId, timer);
 
   return round;
