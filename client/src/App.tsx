@@ -83,6 +83,16 @@ function AppContent() {
     setView('create-lobby');
   }, []);
 
+  const handleRejoinGame = useCallback(
+    (lobbyId: string) => {
+      setLobbyInfo({ lobbyId, joinCode: '', hostId: '' });
+      setInitialRound(null);
+      setView('game');
+      connectToLobby(lobbyId);
+    },
+    [connectToLobby]
+  );
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: colors.background, fontFamily: fonts.base }}>
@@ -162,16 +172,6 @@ function AppContent() {
       />
     );
   }
-
-  const handleRejoinGame = useCallback(
-    (lobbyId: string) => {
-      setLobbyInfo({ lobbyId, joinCode: '', hostId: '' });
-      setInitialRound(null);
-      setView('game');
-      connectToLobby(lobbyId);
-    },
-    [connectToLobby]
-  );
 
   return <LobbyListPage onEnterLobby={handleEnterLobby} onRejoinGame={handleRejoinGame} onOpenLeaderboard={handleOpenLeaderboard} onOpenAdmin={isAdmin ? handleOpenAdmin : undefined} onCreateLobby={handleOpenCreateLobby} />;
 }
