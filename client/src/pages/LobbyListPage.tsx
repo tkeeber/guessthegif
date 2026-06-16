@@ -27,12 +27,13 @@ interface JoinLobbyResponse {
 
 interface LobbyListPageProps {
   onEnterLobby: (lobbyId: string, joinCode: string, hostId: string, lobbyName?: string) => void;
+  onRejoinGame?: (lobbyId: string) => void;
   onOpenLeaderboard?: () => void;
   onOpenAdmin?: () => void;
   onCreateLobby?: () => void;
 }
 
-export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenAdmin, onCreateLobby }: LobbyListPageProps) {
+export default function LobbyListPage({ onEnterLobby, onRejoinGame, onOpenLeaderboard, onOpenAdmin, onCreateLobby }: LobbyListPageProps) {
   const { user, signOut } = useAuth();
   const [lobbies, setLobbies] = useState<LobbyWithHost[]>([]);
   const [joinCode, setJoinCode] = useState('');
@@ -136,7 +137,7 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
         {/* Rejoin active game banner */}
         {activeGame && (
           <button
-            onClick={() => onEnterLobby(activeGame.id, activeGame.joinCode, activeGame.hostId)}
+            onClick={() => onRejoinGame ? onRejoinGame(activeGame.id) : onEnterLobby(activeGame.id, activeGame.joinCode, activeGame.hostId)}
             style={styles.rejoinBanner}
           >
             🎮 You have an active game — tap to rejoin

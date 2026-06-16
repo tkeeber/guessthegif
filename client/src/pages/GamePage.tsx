@@ -423,61 +423,6 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
   // Round pending (between rounds — countdown + start button)
   // ---------------------------------------------------------------------------
 
-  if (phase === 'round-pending') {
-    return (
-      <div style={styles.wrapper}>
-        <div style={styles.container}>
-          {/* Round result (still visible during pending) */}
-          {roundResult && (
-            <div style={styles.resultBox}>
-              {roundResult.type === 'won' ? (
-                <div style={{ marginBottom: 4 }}>✅ WINNER: <strong>{roundResult.winnerUsername}</strong> 🔥 🔥</div>
-              ) : (
-                <div style={{ marginBottom: 4 }}>⏰ Time's up! Nobody guessed it.</div>
-              )}
-              <div style={styles.filmReveal}>{roundResult.filmName}</div>
-              <div style={styles.metadataList}>
-                {roundResult.releaseYear && (
-                  <div style={styles.metadataItem}>📅 {roundResult.releaseYear}</div>
-                )}
-                {roundResult.director && (
-                  <div style={styles.metadataItem}>🎥 {roundResult.director}</div>
-                )}
-                {roundResult.leadActors && (
-                  <div style={styles.metadataItem}>⭐️ {roundResult.leadActors}</div>
-                )}
-                {roundResult.trivia && (
-                  <div style={styles.metadataItem}>🤔 {roundResult.trivia}</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div style={styles.pendingBox}>
-            <div style={styles.pendingTitle}>Round {nextRoundNumber} coming up</div>
-            <div style={styles.pendingCountdown}>
-              {pendingCountdown > 0
-                ? `Starts in ${pendingCountdown}s`
-                : 'Starting…'}
-            </div>
-            {isHost ? (
-              <button
-                onClick={handleStartNextRound}
-                style={{ ...styles.primaryBtn, marginTop: 0 }}
-              >
-                ▶ Start Next Round
-              </button>
-            ) : (
-              <p style={{ color: colors.textMuted, fontSize: 14, margin: 0 }}>
-                Waiting for the host to start next round…
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // ---------------------------------------------------------------------------
   // Session end
   // ---------------------------------------------------------------------------
@@ -532,7 +477,8 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
   // ---------------------------------------------------------------------------
 
   const isRoundActive = phase === 'active';
-  const showResult = phase === 'round-result' && roundResult;
+  const showResult = (phase === 'round-result' || phase === 'round-pending') && roundResult;
+  const showPending = phase === 'round-pending';
 
   return (
     <div style={styles.wrapper}>
@@ -628,6 +574,30 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
                 <div style={styles.metadataItem}>🤔 {roundResult.trivia}</div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Pending — next round controls */}
+        {showPending && (
+          <div style={styles.pendingBox}>
+            <div style={styles.pendingTitle}>Round {nextRoundNumber} coming up</div>
+            <div style={styles.pendingCountdown}>
+              {pendingCountdown > 0
+                ? `Starts in ${pendingCountdown}s`
+                : 'Starting…'}
+            </div>
+            {isHost ? (
+              <button
+                onClick={handleStartNextRound}
+                style={{ ...styles.primaryBtn, marginTop: 0 }}
+              >
+                ▶ Start Next Round
+              </button>
+            ) : (
+              <p style={{ color: colors.textMuted, fontSize: 14, margin: 0 }}>
+                Waiting for the host to start next round…
+              </p>
+            )}
           </div>
         )}
 

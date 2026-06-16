@@ -163,7 +163,17 @@ function AppContent() {
     );
   }
 
-  return <LobbyListPage onEnterLobby={handleEnterLobby} onOpenLeaderboard={handleOpenLeaderboard} onOpenAdmin={isAdmin ? handleOpenAdmin : undefined} onCreateLobby={handleOpenCreateLobby} />;
+  const handleRejoinGame = useCallback(
+    (lobbyId: string) => {
+      setLobbyInfo({ lobbyId, joinCode: '', hostId: '' });
+      setInitialRound(null);
+      setView('game');
+      connectToLobby(lobbyId);
+    },
+    [connectToLobby]
+  );
+
+  return <LobbyListPage onEnterLobby={handleEnterLobby} onRejoinGame={handleRejoinGame} onOpenLeaderboard={handleOpenLeaderboard} onOpenAdmin={isAdmin ? handleOpenAdmin : undefined} onCreateLobby={handleOpenCreateLobby} />;
 }
 
 function App() {
