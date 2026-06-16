@@ -26,7 +26,7 @@ interface JoinLobbyResponse {
 }
 
 interface LobbyListPageProps {
-  onEnterLobby: (lobbyId: string, joinCode: string, hostId: string) => void;
+  onEnterLobby: (lobbyId: string, joinCode: string, hostId: string, lobbyName?: string) => void;
   onOpenLeaderboard?: () => void;
   onOpenAdmin?: () => void;
   onCreateLobby?: () => void;
@@ -107,7 +107,7 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
         `/api/lobbies/${encodeURIComponent(lobby.join_code)}/join`,
         { method: 'POST' }
       );
-      onEnterLobby(data.lobby.id, data.lobby.join_code, data.lobby.host_id);
+      onEnterLobby(data.lobby.id, data.lobby.join_code, data.lobby.host_id, lobby.name ?? undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join lobby');
     }

@@ -503,4 +503,56 @@ router.post('/:id/fill-bots', requireAuth, async (req: AuthenticatedRequest, res
   }
 });
 
+// DELETE /api/lobbies/:id
+// Close a lobby. Only the host can close. Sets status to 'closed' and broadcasts lobby:closed.
+router.delete('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'unauthorized', message: 'Not authenticated' });
+      return;
+    }
+
+    const { id } = req.params;
+
+    // Look up the player record
+    const playerResult = await pool.query(
+      'SELECT id FROM players WHERE supabase_user_id = $1',
+      [req.user.id]
+    );
+    if (playerResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found', message: 'Player profile not found' });
+      return;
+    }
+    const playerId = playerResult.rows[0].id;
+
+    // Fetch the lobby
+    const lobbyResult = await pool.query('SELECT * FROM lobbies WHERE id = $1', [id]);
+    if (lobbyResult.rows.length === 0) {
+      res.status(404).json({ error: 'not_found', message: 'Lobby not found' });
+      return;
+    }
+    const lobby = lobbyResult.rows[0];
+
+    // Only the host can close
+    if (lobby.host_id !== playerId) {
+      res.status(403).json({ error: 'forbidden', message: 'Only the host can close the lobby' });
+      return;
+    }
+
+    // Set status to closed
+    await pool.query("UPDATE lobbies SET status = 'closed' WHERE id = $1", [id]);
+
+    // Broadcast lobby:closed to all sockets in the room
+    const { io } = require('../index');
+    if (io) {
+      io.to(id).emit('lobby:closed');
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Close lobby error:', error);
+    res.status(500).json({ error: 'server_error', message: 'Internal server error' });
+  }
+});
+
 export default router;

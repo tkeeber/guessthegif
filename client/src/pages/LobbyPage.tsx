@@ -20,11 +20,25 @@ export interface RoundStartData {
   players: { playerId: string; username: string }[];
 }
 
+interface LeaderboardEntry {
+  rank: number;
+  playerId: string;
+  username: string;
+  correctGuessCount: number;
+}
+
+interface LeaderboardResponse {
+  seasonId: string;
+  seasonNumber: number;
+  entries: LeaderboardEntry[];
+}
+
 interface LobbyPageProps {
   lobbyId: string;
   joinCode: string;
   /** The host's player ID (from the lobby record). Empty string if current user is host. */
   hostId: string;
+  lobbyName?: string;
   currentUserId: string;
   onBack: () => void;
   onGameStart: (lobbyId: string, initialRound: RoundStartData) => void;
@@ -34,6 +48,7 @@ export default function LobbyPage({
   lobbyId,
   joinCode,
   hostId,
+  lobbyName,
   currentUserId,
   onBack,
   onGameStart,
@@ -46,6 +61,24 @@ export default function LobbyPage({
   const [isHost, setIsHost] = useState(!hostId);
   const [copied, setCopied] = useState(false);
   const [fillingBots, setFillingBots] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [rankMap, setRankMap] = useState<Record<string, number>>({});
+
+  // Fetch leaderboard on mount to build username → rank map
+  useEffect(() => {
+    apiFetch<LeaderboardResponse>('/api/leaderboard')
+      .then((data) => {
+        const map: Record<string, number> = {};
+        for (const entry of data.entries) {
+          map[entry.username] = entry.rank;
+        }
+        setRankMap(map);
+      })
+      .catch(() => {
+        // Non-critical
+      });
+  }, []);
 
   // Register event listeners on the shared socket
   useEffect(() => {
@@ -68,16 +101,22 @@ export default function LobbyPage({
       setStarting(false);
     }
 
+    function handleLobbyClosed() {
+      onBack();
+    }
+
     socket.on('lobby:update', handleLobbyUpdate);
     socket.on('round:start', handleRoundStart);
     socket.on('error' as any, handleError);
+    socket.on('lobby:closed', handleLobbyClosed);
 
     return () => {
       socket.off('lobby:update', handleLobbyUpdate);
       socket.off('round:start', handleRoundStart);
       socket.off('error' as any, handleError);
+      socket.off('lobby:closed', handleLobbyClosed);
     };
-  }, [socket, lobbyId, onGameStart, currentUserId]);
+  }, [socket, lobbyId, onGameStart, currentUserId, onBack]);
 
   const handleStart = useCallback(() => {
     if (!socket) return;
@@ -107,6 +146,20 @@ export default function LobbyPage({
     }
   }
 
+  async function handleCloseLobby() {
+    setClosing(true);
+    setError('');
+    try {
+      await apiFetch(`/api/lobbies/${lobbyId}`, { method: 'DELETE' });
+      // The lobby:closed event will trigger onBack for everyone including the host
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to close lobby');
+      setShowCloseConfirm(false);
+    } finally {
+      setClosing(false);
+    }
+  }
+
   const canStart = isHost && players.length >= 2 && !starting;
 
   return (
@@ -119,7 +172,7 @@ export default function LobbyPage({
 
         {/* Lobby header */}
         <div style={styles.headerCard}>
-          <h1 style={styles.title}>Lobby</h1>
+          <h1 style={styles.title}>{lobbyName || 'Lobby'}</h1>
           <div style={styles.codeRow}>
             <span style={styles.codeLabel}>Join Code</span>
             <span style={styles.code}>{joinCode}</span>
@@ -154,18 +207,25 @@ export default function LobbyPage({
             <p style={styles.muted}>Waiting for players…</p>
           ) : (
             <ul style={styles.list}>
-              {players.map((p, idx) => (
-                <li key={p.playerId} style={styles.playerItem}>
-                  <div style={styles.playerLeft}>
-                    <span style={styles.onlineDot} />
-                    <span style={styles.playerName}>
-                      {p.username}
-                      {isBot(p.username) && <span style={styles.botBadge}> 🤖</span>}
-                    </span>
-                  </div>
-                  {idx === 0 && <span style={styles.hostBadge}>👑</span>}
-                </li>
-              ))}
+              {players.map((p, idx) => {
+                const playerUsername = p.username.replace(' (host)', '');
+                const rank = rankMap[playerUsername];
+                return (
+                  <li key={p.playerId} style={styles.playerItem}>
+                    <div style={styles.playerLeft}>
+                      <span style={styles.onlineDot} />
+                      <span style={styles.playerName}>
+                        {p.username}
+                        {isBot(playerUsername) && <span style={styles.botBadge}> 🤖</span>}
+                      </span>
+                      {!isBot(playerUsername) && rank != null && (
+                        <span style={styles.rankBadge}>#{rank}</span>
+                      )}
+                    </div>
+                    {idx === 0 && <span style={styles.hostBadge}>👑</span>}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -199,6 +259,34 @@ export default function LobbyPage({
 
         {!isHost && (
           <p style={styles.waitingText}>Waiting for the host to start the game…</p>
+        )}
+
+        {/* Close Lobby button (host only) */}
+        {isHost && (
+          <button
+            onClick={() => setShowCloseConfirm(true)}
+            style={styles.closeLobbyBtn}
+          >
+            Close Lobby
+          </button>
+        )}
+
+        {/* Close Lobby confirmation overlay */}
+        {showCloseConfirm && (
+          <div style={styles.confirmOverlay}>
+            <div style={styles.confirmBox}>
+              <p style={styles.confirmText}>Are you sure you want to close this lobby?</p>
+              <p style={styles.confirmSubtext}>All players will be sent back to the lobby list.</p>
+              <div style={styles.confirmButtons}>
+                <button onClick={handleCloseLobby} disabled={closing} style={styles.confirmYes}>
+                  {closing ? 'Closing…' : 'Yes, close'}
+                </button>
+                <button onClick={() => setShowCloseConfirm(false)} style={styles.confirmNo}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -328,6 +416,16 @@ const styles: Record<string, React.CSSProperties> = {
   hostBadge: {
     fontSize: 18,
   },
+  rankBadge: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: colors.secondary,
+    background: 'rgba(245, 158, 11, 0.15)',
+    border: `1px solid ${colors.secondary}`,
+    borderRadius: 4,
+    padding: '2px 6px',
+    marginLeft: 4,
+  },
   waitingText: {
     color: colors.textMuted,
     fontSize: 14,
@@ -343,6 +441,18 @@ const styles: Record<string, React.CSSProperties> = {
     background: `linear-gradient(135deg, ${colors.primary}, ${colors.success})`,
     color: '#ffffff',
     width: '100%',
+  },
+  closeLobbyBtn: {
+    padding: '12px 0',
+    fontSize: 14,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: `1px solid ${colors.error}`,
+    background: 'transparent',
+    color: colors.error,
+    cursor: 'pointer',
+    width: '100%',
+    marginTop: 16,
   },
   botBadge: {
     fontSize: 14,
@@ -381,5 +491,60 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#fff',
     cursor: 'pointer',
     marginLeft: 'auto',
+  },
+  confirmOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0, 0, 0, 0.7)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  confirmBox: {
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+    padding: '24px 28px',
+    textAlign: 'center',
+    maxWidth: 320,
+    width: '90%',
+  },
+  confirmText: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: 500,
+    margin: '0 0 8px',
+  },
+  confirmSubtext: {
+    color: colors.textMuted,
+    fontSize: 13,
+    margin: '0 0 20px',
+  },
+  confirmButtons: {
+    display: 'flex',
+    gap: 12,
+  },
+  confirmYes: {
+    flex: 1,
+    padding: '12px 0',
+    fontSize: 15,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: 'none',
+    background: colors.error,
+    color: '#fff',
+    cursor: 'pointer',
+  },
+  confirmNo: {
+    flex: 1,
+    padding: '12px 0',
+    fontSize: 15,
+    fontWeight: 600,
+    borderRadius: radii.button,
+    border: `1px solid ${colors.surfaceBorder}`,
+    background: 'transparent',
+    color: colors.textSecondary,
+    cursor: 'pointer',
   },
 };

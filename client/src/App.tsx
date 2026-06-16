@@ -22,6 +22,7 @@ interface LobbyInfo {
   lobbyId: string;
   joinCode: string;
   hostId: string;
+  lobbyName?: string;
 }
 
 function AppContent() {
@@ -51,8 +52,8 @@ function AppContent() {
   }, [user]);
 
   const handleEnterLobby = useCallback(
-    (lobbyId: string, joinCode: string, hostId: string) => {
-      setLobbyInfo({ lobbyId, joinCode, hostId });
+    (lobbyId: string, joinCode: string, hostId: string, lobbyName?: string) => {
+      setLobbyInfo({ lobbyId, joinCode, hostId, lobbyName });
       setView('lobby');
       connectToLobby(lobbyId);
     },
@@ -132,6 +133,7 @@ function AppContent() {
         lobbyId={lobbyInfo.lobbyId}
         joinCode={lobbyInfo.joinCode}
         hostId={lobbyInfo.hostId}
+        lobbyName={lobbyInfo.lobbyName}
         currentUserId={user.id}
         onBack={handleBackToList}
         onGameStart={handleGameStart}
@@ -153,8 +155,8 @@ function AppContent() {
     return (
       <CreateLobbyPage
         onBack={() => setView('lobby-list')}
-        onCreated={(lobbyId, joinCode, hostId) => {
-          handleEnterLobby(lobbyId, joinCode, hostId);
+        onCreated={(lobbyId, joinCode, hostId, lobbyName) => {
+          handleEnterLobby(lobbyId, joinCode, hostId, lobbyName);
         }}
       />
     );

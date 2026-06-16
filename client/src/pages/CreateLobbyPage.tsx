@@ -3,12 +3,12 @@ import { apiFetch } from '../lib/api';
 import { colors, radii, commonStyles } from '../styles/theme';
 
 interface CreateLobbyResponse {
-  lobby: { id: string; join_code: string; host_id: string };
+  lobby: { id: string; join_code: string; host_id: string; name?: string | null };
 }
 
 interface CreateLobbyPageProps {
   onBack: () => void;
-  onCreated: (lobbyId: string, joinCode: string, hostId: string) => void;
+  onCreated: (lobbyId: string, joinCode: string, hostId: string, lobbyName?: string) => void;
 }
 
 export default function CreateLobbyPage({ onBack, onCreated }: CreateLobbyPageProps) {
@@ -33,7 +33,7 @@ export default function CreateLobbyPage({ onBack, onCreated }: CreateLobbyPagePr
           botsAllowed,
         }),
       });
-      onCreated(data.lobby.id, data.lobby.join_code, data.lobby.host_id || '');
+      onCreated(data.lobby.id, data.lobby.join_code, data.lobby.host_id || '', data.lobby.name ?? undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create lobby');
     } finally {
