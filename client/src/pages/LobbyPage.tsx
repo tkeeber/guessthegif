@@ -199,9 +199,16 @@ export default function LobbyPage({
 
         {/* Players list */}
         <div style={styles.playersSection}>
-          <h2 style={styles.sectionTitle}>
-            Players ({players.length})
-          </h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h2 style={{ ...styles.sectionTitle, margin: 0 }}>
+              Players ({players.length})
+            </h2>
+            {isHost && (
+              <button onClick={handleFillBots} disabled={fillingBots} style={styles.fillBotsBtn}>
+                {fillingBots ? 'Adding…' : '🤖 Fill with Bots'}
+              </button>
+            )}
+          </div>
 
           {players.length === 0 ? (
             <p style={styles.muted}>Waiting for players…</p>
@@ -233,14 +240,6 @@ export default function LobbyPage({
         {/* Host controls */}
         {isHost && players.length < 2 && (
           <p style={styles.waitingText}>Need at least 2 players to start.</p>
-        )}
-
-        {isHost && (
-          <div style={styles.botsToggleRow}>
-            <button onClick={handleFillBots} disabled={fillingBots} style={styles.fillBotsBtn}>
-              {fillingBots ? 'Adding…' : '🤖 Fill with Bots'}
-            </button>
-          </div>
         )}
 
         {isHost && (
