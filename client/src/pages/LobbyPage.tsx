@@ -60,6 +60,7 @@ export default function LobbyPage({
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [isHost, setIsHost] = useState(!hostId);
+  const isHostRef = useRef(!hostId);
   const [copied, setCopied] = useState(false);
   const [fillingBots, setFillingBots] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -101,12 +102,14 @@ export default function LobbyPage({
       setPlayers(payload.players);
       playersRef.current = payload.players;
       if (payload.hostSupabaseId) {
-        setIsHost(payload.hostSupabaseId === currentUserId);
+        const hostStatus = payload.hostSupabaseId === currentUserId;
+        setIsHost(hostStatus);
+        isHostRef.current = hostStatus;
       }
     }
 
     function handleRoundStart(payload: { roundNumber: number; gifUrl: string }) {
-      onGameStart(lobbyId, { roundNumber: payload.roundNumber, gifUrl: payload.gifUrl, players: playersRef.current, isHost });
+      onGameStart(lobbyId, { roundNumber: payload.roundNumber, gifUrl: payload.gifUrl, players: playersRef.current, isHost: isHostRef.current });
     }
 
     function handleError(payload: { message?: string }) {

@@ -481,6 +481,11 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
   const showResult = (phase === 'round-result' || phase === 'round-pending') && roundResult;
   const showPending = phase === 'round-pending';
 
+  // Debug: log isHost and phase
+  if (showPending) {
+    console.log('[GamePage] round-pending phase, isHost:', isHost);
+  }
+
   return (
     <div style={styles.wrapper}>
       <div style={styles.container}>
