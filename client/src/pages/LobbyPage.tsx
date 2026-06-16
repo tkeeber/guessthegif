@@ -64,6 +64,8 @@ export default function LobbyPage({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closing, setClosing] = useState(false);
   const [rankMap, setRankMap] = useState<Record<string, number>>({});
+  const [hostUsername, setHostUsername] = useState<string>('');
+  const [createdAt, setCreatedAt] = useState<string>('');
 
   // Fetch leaderboard on mount to build username → rank map
   useEffect(() => {
@@ -75,10 +77,18 @@ export default function LobbyPage({
         }
         setRankMap(map);
       })
-      .catch(() => {
-        // Non-critical
-      });
-  }, []);
+      .catch(() => {});
+
+    // Fetch lobby details for host username and created time
+    apiFetch<{ lobby: { host_username?: string; hostUsername?: string; created_at?: string } }>(`/api/lobbies/${lobbyId}/details`)
+      .then((data) => {
+        setHostUsername(data.lobby.hostUsername || data.lobby.host_username || '');
+        if (data.lobby.created_at) {
+          setCreatedAt(new Date(data.lobby.created_at).toLocaleString());
+        }
+      })
+      .catch(() => {});
+  }, [lobbyId]);
 
   // Register event listeners on the shared socket
   useEffect(() => {
@@ -172,7 +182,14 @@ export default function LobbyPage({
 
         {/* Lobby header */}
         <div style={styles.headerCard}>
-          <h1 style={styles.title}>{lobbyName || 'Lobby'}</h1>
+          <h1 style={styles.title}>{lobbyName ? `Welcome to the lobby - ${lobbyName}` : 'Welcome to the lobby'}</h1>
+          {(hostUsername || createdAt) && (
+            <p style={{ color: colors.textMuted, fontSize: 13, margin: '0 0 12px' }}>
+              {hostUsername && <>Hosted by <strong style={{ color: colors.textSecondary }}>{hostUsername}</strong></>}
+              {hostUsername && createdAt && ' · '}
+              {createdAt && <>Created {createdAt}</>}
+            </p>
+          )}
           <div style={styles.codeRow}>
             <span style={styles.codeLabel}>Join Code</span>
             <span style={styles.code}>{joinCode}</span>

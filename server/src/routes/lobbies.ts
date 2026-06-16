@@ -139,6 +139,37 @@ router.get('/active', requireAuth, async (req: AuthenticatedRequest, res: Respon
   }
 });
 
+// GET /api/lobbies/:id/details
+// Get lobby details including host username and creation time
+router.get('/:id/details', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT l.id, l.name, l.created_at, p.username AS host_username
+         FROM lobbies l
+         JOIN players p ON p.id = l.host_id
+        WHERE l.id = $1`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'not_found', message: 'Lobby not found' });
+      return;
+    }
+    const row = result.rows[0];
+    res.status(200).json({
+      lobby: {
+        id: row.id,
+        name: row.name,
+        hostUsername: row.host_username,
+        created_at: row.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Lobby details error:', error);
+    res.status(500).json({ error: 'server_error', message: 'Internal server error' });
+  }
+});
+
 // POST /api/lobbies
 // Create a new lobby with a unique 6-char join code, add host as first player
 router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
