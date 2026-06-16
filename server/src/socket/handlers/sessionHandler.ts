@@ -81,7 +81,7 @@ export function registerSessionHandler(
   // -------------------------------------------------------------------------
   // round:next — host skips the auto-start timer to begin the next round now
   // -------------------------------------------------------------------------
-  socket.on('round:next', async () => {
+  socket.on('round:next', async (_payload: Record<string, never>) => {
     const playerId = socket.data.playerId;
     console.log('[round:next] Received from player:', playerId);
 
@@ -93,7 +93,7 @@ export function registerSessionHandler(
            JOIN lobbies l ON l.id = s.lobby_id
           WHERE l.host_id = $1
             AND s.status = 'active'
-          ORDER BY s.created_at DESC
+          ORDER BY s.started_at DESC
           LIMIT 1`,
         [playerId]
       );
