@@ -354,6 +354,7 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
   }
 
   function handleStartNextRound() {
+    console.log('[GamePage] Emitting round:next, socket connected:', socket?.connected);
     socket?.emit('round:next', {});
   }
 

@@ -83,6 +83,7 @@ export function registerSessionHandler(
   // -------------------------------------------------------------------------
   socket.on('round:next', async () => {
     const playerId = socket.data.playerId;
+    console.log('[round:next] Received from player:', playerId);
 
     try {
       // Find the active session for a lobby where this player is the host
@@ -97,13 +98,17 @@ export function registerSessionHandler(
         [playerId]
       );
 
+      console.log('[round:next] Session query rows:', result.rows.length);
+
       if (result.rows.length === 0) {
-        // Not a host with an active session — silently ignore
+        console.log('[round:next] No active session found for this host — ignoring');
         return;
       }
 
       const sessionId = result.rows[0].session_id;
+      console.log('[round:next] Triggering next round for session:', sessionId);
       await triggerNextRound(io, sessionId);
+      console.log('[round:next] triggerNextRound completed');
     } catch (err) {
       console.error('[round:next] Error:', err);
     }
