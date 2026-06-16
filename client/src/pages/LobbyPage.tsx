@@ -238,9 +238,6 @@ export default function LobbyPage({
         </div>
 
         {/* Host controls */}
-        {isHost && players.length < 2 && (
-          <p style={styles.waitingText}>Need at least 2 players to start.</p>
-        )}
 
         {isHost && (
           <button
@@ -252,7 +249,7 @@ export default function LobbyPage({
               cursor: canStart ? 'pointer' : 'not-allowed',
             }}
           >
-            {starting ? 'Starting…' : 'Start Game'}
+            {starting ? 'Starting…' : canStart ? 'Start Game' : 'Min 2 players'}
           </button>
         )}
 
