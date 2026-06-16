@@ -9,6 +9,8 @@ import {
 } from '../types';
 import { LobbyStatus } from '../types';
 import { botManager } from '../services/botManager';
+import { BotPlayer } from '../services/botPlayer';
+import { BOT_PERSONALITIES } from '../services/botPersonalities';
 
 const router = Router();
 
@@ -466,6 +468,21 @@ router.post('/:id/fill-bots', requireAuth, async (req: AuthenticatedRequest, res
         })),
         hostSupabaseId,
       });
+    }
+
+    // Connect bots via Socket.IO so they can participate in the game
+    const serverPort = parseInt(process.env.PORT || '3001', 10);
+    const botSecret = process.env.BOT_INTERNAL_SECRET || '';
+    if (botSecret) {
+      for (const bot of botsResult.rows) {
+        // Determine personality from username prefix
+        let personality = BOT_PERSONALITIES.novice;
+        if (bot.username.startsWith('IntermediateBot_')) personality = BOT_PERSONALITIES.intermediate;
+        else if (bot.username.startsWith('ExpertBot_')) personality = BOT_PERSONALITIES.expert;
+
+        const botPlayer = new BotPlayer(bot.id, bot.username, personality);
+        botPlayer.connect(id, serverPort);
+      }
     }
 
     res.status(200).json({ success: true, botsAdded: botsResult.rows.length });
