@@ -266,7 +266,7 @@ export default function LobbyPage({
               cursor: canStart ? 'pointer' : 'not-allowed',
             }}
           >
-            {starting ? 'Starting…' : canStart ? 'Start Game' : 'Min 2 players'}
+            {starting ? 'Starting…' : canStart ? 'Start Game' : 'Start Game ( Min 2 players )'}
           </button>
         )}
 
