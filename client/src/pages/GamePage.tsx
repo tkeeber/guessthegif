@@ -171,7 +171,7 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
       setGifUrl(initialRound.gifUrl);
       setClue(null);
       setRoundResult(null);
-      setFeedEntries([]);
+      setFeedEntries([{ id: `sys-${++feedIdCounter}`, type: 'chat' as const, username: '🎬 System', text: `Round ${initialRound.roundNumber} started!`, timestamp: new Date().toISOString() }]);
       setPendingCountdown(0);
       clueReceivedRef.current = false;
       startCountdown(120);
@@ -198,7 +198,11 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
       setGifUrl(payload.gifUrl);
       setClue(null);
       setRoundResult(null);
-      setFeedEntries([]);
+      // Add system message for new round
+      setFeedEntries((prev) => [
+        ...prev,
+        { id: `sys-${++feedIdCounter}`, type: 'chat' as const, username: '🎬 System', text: `Round ${payload.roundNumber} started!`, timestamp: new Date().toISOString() },
+      ]);
       setPendingCountdown(0);
       clueReceivedRef.current = false;
       startCountdown(120);
@@ -221,6 +225,10 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
         leadActors: payload.leadActors,
         trivia: payload.trivia,
       });
+      setFeedEntries((prev) => [
+        ...prev,
+        { id: `sys-${++feedIdCounter}`, type: 'chat' as const, username: '🎬 System', text: `✅ ${payload.winnerUsername} guessed it! The film was ${payload.filmName}`, timestamp: new Date().toISOString() },
+      ]);
       setPhase('round-result');
     }
 
@@ -234,6 +242,10 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
         leadActors: payload.leadActors,
         trivia: payload.trivia,
       });
+      setFeedEntries((prev) => [
+        ...prev,
+        { id: `sys-${++feedIdCounter}`, type: 'chat' as const, username: '🎬 System', text: `⏰ Time's up! The film was ${payload.filmName}`, timestamp: new Date().toISOString() },
+      ]);
       setPhase('round-result');
     }
 
@@ -611,7 +623,7 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = fal
         <GuessFeed
           entries={feedEntries}
           onSubmit={handleSubmitGuess}
-          disabled={!isRoundActive}
+          disabled={phase === 'disconnected'}
         />
 
         {/* Player list */}
