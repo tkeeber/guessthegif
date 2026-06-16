@@ -45,8 +45,6 @@ export default function LobbyPage({
   const [starting, setStarting] = useState(false);
   const [isHost, setIsHost] = useState(!hostId);
   const [copied, setCopied] = useState(false);
-  const [botsAllowed, setBotsAllowed] = useState(true);
-  const [togglingBots, setTogglingBots] = useState(false);
   const [fillingBots, setFillingBots] = useState(false);
 
   // Register event listeners on the shared socket
@@ -95,23 +93,6 @@ export default function LobbyPage({
     }).catch(() => {
       // Fallback: do nothing
     });
-  }
-
-  async function handleToggleBots() {
-    const newValue = !botsAllowed;
-    setBotsAllowed(newValue);
-    setTogglingBots(true);
-    try {
-      await apiFetch(`/api/lobbies/${lobbyId}/bots-allowed`, {
-        method: 'PATCH',
-        body: JSON.stringify({ botsAllowed: newValue }),
-      });
-    } catch (err) {
-      setBotsAllowed(!newValue);
-      setError(err instanceof Error ? err.message : 'Failed to toggle bots');
-    } finally {
-      setTogglingBots(false);
-    }
   }
 
   async function handleFillBots() {
@@ -196,16 +177,6 @@ export default function LobbyPage({
 
         {isHost && (
           <div style={styles.botsToggleRow}>
-            <label style={styles.botsToggleLabel}>
-              <input
-                type="checkbox"
-                checked={botsAllowed}
-                onChange={handleToggleBots}
-                disabled={togglingBots}
-                style={styles.botsCheckbox}
-              />
-              <span>🤖 Allow Bots</span>
-            </label>
             <button onClick={handleFillBots} disabled={fillingBots} style={styles.fillBotsBtn}>
               {fillingBots ? 'Adding…' : '🤖 Fill with Bots'}
             </button>
