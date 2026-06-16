@@ -8,6 +8,7 @@ import leaderboardRoutes from './routes/leaderboard';
 import adminRoutes from './routes/admin';
 import { initSocketServer } from './socket';
 import { botManager } from './services/botManager';
+import { startCleanupScheduler } from './services/lobbyCleanup';
 
 dotenv.config();
 
@@ -46,6 +47,9 @@ if (process.env.NODE_ENV !== 'test') {
         console.error('[BotManager] Failed to initialize:', err);
       });
     }
+
+    // Start nightly lobby cleanup scheduler (closes lobbies > 12 hours old at 23:00 GMT)
+    startCleanupScheduler();
   });
 
   // Graceful shutdown handlers

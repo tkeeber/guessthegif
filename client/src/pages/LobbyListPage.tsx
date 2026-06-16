@@ -63,23 +63,22 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
     apiFetch<{ activeLobby: { id: string; joinCode: string; hostId: string } | null }>('/api/lobbies/active')
       .then((data) => setActiveGame(data.activeLobby))
       .catch(() => {});
-    // Fetch player stats from leaderboard
-    apiFetch<{ seasonId: string; entries: { rank: number; playerId: string; username: string; correctGuessCount: number }[] }>('/api/leaderboard')
-      .then((data) => {
-        // Find current player's entry by fetching their profile first
-        apiFetch<{ player: { username: string } }>('/api/auth/me').then((profile) => {
-          setPlayerUsername(profile.player.username);
-          const myEntry = data.entries.find((e) => e.username === profile.player.username);
-          if (myEntry) {
-            setPlayerRank(myEntry.rank);
-            setPlayerPoints(myEntry.correctGuessCount);
-          } else {
-            setPlayerRank(0);
-            setPlayerPoints(0);
-          }
-        }).catch(() => {});
-      })
-      .catch(() => {});
+    // Fetch player stats — get profile and leaderboard in parallel
+    Promise.all([
+      apiFetch<{ player: { username: string } }>('/api/auth/me'),
+      apiFetch<{ seasonId: string; entries: { rank: number; playerId: string; username: string; correctGuessCount: number }[] }>('/api/leaderboard'),
+    ]).then(([profileData, leaderboardData]) => {
+      const username = profileData.player.username;
+      setPlayerUsername(username);
+      const myEntry = leaderboardData.entries.find((e) => e.username === username);
+      if (myEntry) {
+        setPlayerRank(myEntry.rank);
+        setPlayerPoints(myEntry.correctGuessCount);
+      } else {
+        setPlayerRank(0);
+        setPlayerPoints(0);
+      }
+    }).catch(() => {});
   }, []);
 
   async function handleJoinByCode() {
