@@ -46,6 +46,9 @@ export default function LoginPage({ onNavigateSignup, onNavigateForgotPassword }
           <p style={styles.tagline}>Eat my GIFS Jeff</p>
         </div>
 
+        {/* BETA BANNER — remove this block when ready for production */}
+        <div style={styles.betaBanner}>🚧 Beta — things may break. Feedback welcome!</div>
+
         {/* Form */}
         <form onSubmit={handleSubmit} style={styles.form} noValidate>
           <h2 style={styles.formTitle}>Sign In</h2>
@@ -128,6 +131,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   logoSection: {
     textAlign: 'center',
+  },
+  betaBanner: {
+    width: '100%',
+    padding: '10px 16px',
+    fontSize: 13,
+    fontWeight: 600,
+    textAlign: 'center' as const,
+    borderRadius: 8,
+    background: 'rgba(245, 158, 11, 0.15)',
+    border: '1px solid #f59e0b',
+    color: '#f59e0b',
   },
   logo: {
     fontSize: 32,
