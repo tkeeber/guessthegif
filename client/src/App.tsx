@@ -12,10 +12,11 @@ import LobbyPage from './pages/LobbyPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
 import GamePage from './pages/GamePage';
+import CreateLobbyPage from './pages/CreateLobbyPage';
 import type { RoundStartData } from './pages/LobbyPage';
 
 type AuthPage = 'login' | 'signup' | 'forgot-password';
-type AppView = 'lobby-list' | 'lobby' | 'game' | 'leaderboard' | 'admin';
+type AppView = 'lobby-list' | 'lobby' | 'game' | 'leaderboard' | 'admin' | 'create-lobby';
 
 interface LobbyInfo {
   lobbyId: string;
@@ -75,6 +76,10 @@ function AppContent() {
 
   const handleOpenAdmin = useCallback(() => {
     setView('admin');
+  }, []);
+
+  const handleOpenCreateLobby = useCallback(() => {
+    setView('create-lobby');
   }, []);
 
   if (loading) {
@@ -144,7 +149,18 @@ function AppContent() {
     );
   }
 
-  return <LobbyListPage onEnterLobby={handleEnterLobby} onOpenLeaderboard={handleOpenLeaderboard} onOpenAdmin={isAdmin ? handleOpenAdmin : undefined} />;
+  if (view === 'create-lobby') {
+    return (
+      <CreateLobbyPage
+        onBack={() => setView('lobby-list')}
+        onCreated={(lobbyId, joinCode, hostId) => {
+          handleEnterLobby(lobbyId, joinCode, hostId);
+        }}
+      />
+    );
+  }
+
+  return <LobbyListPage onEnterLobby={handleEnterLobby} onOpenLeaderboard={handleOpenLeaderboard} onOpenAdmin={isAdmin ? handleOpenAdmin : undefined} onCreateLobby={handleOpenCreateLobby} />;
 }
 
 function App() {

@@ -12,14 +12,13 @@ interface LobbyWithHost {
   playerCount: number;
   created_at: string;
   botsAllowed?: boolean;
+  name?: string | null;
+  maxPlayers: number;
+  inviteOnly: boolean;
 }
 
 interface ListLobbiesResponse {
   lobbies: LobbyWithHost[];
-}
-
-interface CreateLobbyResponse {
-  lobby: { id: string; join_code: string };
 }
 
 interface JoinLobbyResponse {
@@ -30,15 +29,15 @@ interface LobbyListPageProps {
   onEnterLobby: (lobbyId: string, joinCode: string, hostId: string) => void;
   onOpenLeaderboard?: () => void;
   onOpenAdmin?: () => void;
+  onCreateLobby?: () => void;
 }
 
-export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenAdmin }: LobbyListPageProps) {
+export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenAdmin, onCreateLobby }: LobbyListPageProps) {
   const { user, signOut } = useAuth();
   const [lobbies, setLobbies] = useState<LobbyWithHost[]>([]);
   const [joinCode, setJoinCode] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [playerRank, setPlayerRank] = useState<number | null>(null);
   const [playerPoints, setPlayerPoints] = useState<number | null>(null);
@@ -82,21 +81,6 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
       })
       .catch(() => {});
   }, []);
-
-  async function handleCreate() {
-    try {
-      setCreating(true);
-      setError('');
-      const data = await apiFetch<CreateLobbyResponse>('/api/lobbies', {
-        method: 'POST',
-      });
-      onEnterLobby(data.lobby.id, data.lobby.join_code, '');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create lobby');
-    } finally {
-      setCreating(false);
-    }
-  }
 
   async function handleJoinByCode() {
     const code = joinCode.trim().toUpperCase();
@@ -163,14 +147,10 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
         {/* Action buttons */}
         <div style={styles.actionRow}>
           <button
-            onClick={handleCreate}
-            disabled={creating}
-            style={{
-              ...styles.actionBtn,
-              opacity: creating ? 0.7 : 1,
-            }}
+            onClick={onCreateLobby}
+            style={styles.actionBtn}
           >
-            {creating ? 'Creating…' : 'Create Lobby'}
+            Create Lobby
           </button>
         </div>
 
@@ -220,11 +200,20 @@ export default function LobbyListPage({ onEnterLobby, onOpenLeaderboard, onOpenA
               {lobbies.map((lobby) => (
                 <li key={lobby.id} style={styles.lobbyCard}>
                   <div style={styles.lobbyInfo}>
-                    <span style={styles.lobbyName}>
-                      {lobby.hostUsername === playerUsername ? '⭐ Your lobby' : `${lobby.hostUsername}'s lobby`}
-                    </span>
+                    <div style={styles.lobbyNameRow}>
+                      <span style={styles.lobbyName}>
+                        {lobby.name
+                          ? lobby.name
+                          : lobby.hostUsername === playerUsername
+                            ? '⭐ Your lobby'
+                            : `${lobby.hostUsername}'s lobby`}
+                      </span>
+                      {lobby.inviteOnly && (
+                        <span style={styles.inviteBadge}>Invite Only</span>
+                      )}
+                    </div>
                     <span style={styles.playerCount}>
-                      {lobby.playerCount} player{lobby.playerCount !== 1 ? 's' : ''}
+                      {lobby.playerCount}/{lobby.maxPlayers} player{lobby.playerCount !== 1 ? 's' : ''}
                     </span>
                   </div>
                   <button
@@ -419,10 +408,25 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 4,
   },
+  lobbyNameRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
   lobbyName: {
     fontSize: 15,
     fontWeight: 600,
     color: colors.textPrimary,
+  },
+  inviteBadge: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: colors.secondary,
+    border: `1px solid ${colors.secondary}`,
+    borderRadius: 4,
+    padding: '2px 6px',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   playerCount: {
     fontSize: 13,

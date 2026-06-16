@@ -40,6 +40,9 @@ export interface LobbyWithHost {
   status: LobbyStatus;
   playerCount: number;
   botsAllowed?: boolean;
+  name?: string | null;
+  maxPlayers: number;
+  inviteOnly: boolean;
   created_at: string;
 }
 

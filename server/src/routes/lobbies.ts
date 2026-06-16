@@ -56,12 +56,15 @@ router.get('/', requireAuth, async (_req: AuthenticatedRequest, res: Response): 
         p.username AS host_username,
         l.status,
         l.bots_allowed,
+        l.name,
+        l.max_players,
+        l.invite_only,
         l.created_at,
         COUNT(lp.player_id)::int AS player_count
       FROM lobbies l
       JOIN players p ON p.id = l.host_id
       LEFT JOIN lobby_players lp ON lp.lobby_id = l.id
-      WHERE l.status = $1
+      WHERE l.status = $1 AND l.invite_only = FALSE
       GROUP BY l.id, p.username
       ORDER BY l.created_at DESC`,
       [LobbyStatus.Waiting]
@@ -75,6 +78,9 @@ router.get('/', requireAuth, async (_req: AuthenticatedRequest, res: Response): 
       status: row.status,
       playerCount: row.player_count,
       botsAllowed: row.bots_allowed,
+      name: row.name,
+      maxPlayers: row.max_players,
+      inviteOnly: row.invite_only,
       created_at: row.created_at,
     }));
 
@@ -170,16 +176,21 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res: Response): 
     // Accept optional botsAllowed param (defaults to true)
     const botsAllowed = req.body.botsAllowed !== false;
 
+    // Accept optional lobby options
+    const lobbyName: string | null = req.body.name && typeof req.body.name === 'string' ? req.body.name.slice(0, 100) : null;
+    const maxPlayers: number = [4, 6, 8].includes(req.body.maxPlayers) ? req.body.maxPlayers : 8;
+    const inviteOnly: boolean = req.body.inviteOnly === true;
+
     // Create lobby and add host as first player in a transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
       const lobbyResult = await client.query(
-        `INSERT INTO lobbies (join_code, host_id, status, bots_allowed)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO lobbies (join_code, host_id, status, bots_allowed, name, max_players, invite_only)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [joinCode, playerId, LobbyStatus.Waiting, botsAllowed]
+        [joinCode, playerId, LobbyStatus.Waiting, botsAllowed, lobbyName, maxPlayers, inviteOnly]
       );
 
       const lobby = lobbyResult.rows[0];
