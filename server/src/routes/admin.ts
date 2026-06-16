@@ -150,8 +150,8 @@ router.post('/gifs', async (req: AuthenticatedRequest, res: Response): Promise<v
     }
 
     const result = await pool.query(
-      `INSERT INTO gifs (film_name, tmdb_movie_id, giphy_gif_id, gif_url, lead_actors, release_year, theme)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO gifs (film_name, tmdb_movie_id, giphy_gif_id, gif_url, lead_actors, release_year, theme, director, trivia)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         body.filmName,
@@ -161,6 +161,8 @@ router.post('/gifs', async (req: AuthenticatedRequest, res: Response): Promise<v
         body.leadActors,
         body.releaseYear,
         body.theme,
+        body.director || null,
+        body.trivia || null,
       ]
     );
 
@@ -187,6 +189,8 @@ router.put('/gifs/:id', async (req: AuthenticatedRequest, res: Response): Promis
       leadActors: 'lead_actors',
       releaseYear: 'release_year',
       theme: 'theme',
+      director: 'director',
+      trivia: 'trivia',
     };
 
     const setClauses: string[] = [];

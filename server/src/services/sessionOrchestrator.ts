@@ -1,7 +1,8 @@
 /**
  * SessionOrchestrator — orchestrates the flow between rounds within a
- * session. After a round ends (won or timeout), waits 5 seconds, then
- * starts the next round. After all 3 rounds, generates a session summary,
+ * session. After a round ends (won or timeout), broadcasts round:pending,
+ * starts a 30-second auto-start timer, and allows the host to skip via
+ * triggerNextRound(). After all rounds, generates a session summary,
  * checks for a season winner, and broadcasts session:end.
  *
  * Requirements: 4.1, 4.3, 4.4
@@ -17,7 +18,7 @@ import { checkForSeasonWinner, endSeason } from './seasonManager';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const BETWEEN_ROUND_DELAY_MS = 5_000; // 5 seconds between rounds
+const AUTO_START_SECONDS = 30; // seconds before next round auto-starts
 
 // ---------------------------------------------------------------------------
 // Per-session config — stores timePerGifMs and totalRounds set at session start
@@ -29,9 +30,14 @@ interface SessionConfig {
 const sessionConfigs = new Map<string, SessionConfig>();
 
 // ---------------------------------------------------------------------------
-// Active delay timers — keyed by session ID so they can be cleared if needed
+// Pending rounds — keyed by session ID, tracks next-round auto-start timers
 // ---------------------------------------------------------------------------
-const sessionTimers = new Map<string, NodeJS.Timeout>();
+interface PendingRound {
+  nextRoundId: string;
+  lobbyId: string;
+  startTimer: NodeJS.Timeout;
+}
+const pendingRounds = new Map<string, PendingRound>();
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -60,7 +66,6 @@ export async function onRoundEnd(
   // Look up this session's config (total rounds)
   const config = sessionConfigs.get(sessionId);
   const totalRounds = config?.totalRounds ?? 3;
-  const timePerGifMs = config?.timePerGifMs ?? 60_000;
 
   // Count completed rounds (won or timeout)
   const completedRounds = rounds.filter(
@@ -85,17 +90,25 @@ export async function onRoundEnd(
     return;
   }
 
-  // Start the next round after a 5-second delay
-  const timer = setTimeout(async () => {
-    sessionTimers.delete(sessionId);
-    try {
-      await startRound(io, nextRound.id, lobbyId, timePerGifMs / 1000);
-    } catch (err) {
-      console.error('Error starting next round:', err);
-    }
-  }, BETWEEN_ROUND_DELAY_MS);
+  // Broadcast round:pending so all clients show the countdown
+  io.to(lobbyId).emit('round:pending', {
+    nextRoundNumber: nextRound.round_number,
+    autoStartInSeconds: AUTO_START_SECONDS,
+  });
 
-  sessionTimers.set(sessionId, timer);
+  // Start auto-start timer — host can skip this via triggerNextRound()
+  const startTimer = setTimeout(async () => {
+    pendingRounds.delete(sessionId);
+    try {
+      const cfg = sessionConfigs.get(sessionId);
+      const tpgMs = cfg?.timePerGifMs ?? 60_000;
+      await startRound(io, nextRound.id, lobbyId, tpgMs / 1000);
+    } catch (err) {
+      console.error('Error auto-starting next round:', err);
+    }
+  }, AUTO_START_SECONDS * 1000);
+
+  pendingRounds.set(sessionId, { nextRoundId: nextRound.id, lobbyId, startTimer });
 }
 
 /**
@@ -125,6 +138,34 @@ export async function startFirstRound(
   }
 
   await startRound(io, roundResult.rows[0].id, lobbyId, timePerGifMs / 1000);
+}
+
+/**
+ * Called by the host (via round:next socket event) to skip the auto-start
+ * timer and start the next round immediately.
+ */
+export async function triggerNextRound(
+  io: TypedServer,
+  sessionId: string
+): Promise<void> {
+  const pending = pendingRounds.get(sessionId);
+  if (!pending) {
+    // No pending round for this session — nothing to do
+    return;
+  }
+
+  // Cancel the auto-start timer
+  clearTimeout(pending.startTimer);
+  pendingRounds.delete(sessionId);
+
+  const config = sessionConfigs.get(sessionId);
+  const timePerGifMs = config?.timePerGifMs ?? 60_000;
+
+  try {
+    await startRound(io, pending.nextRoundId, pending.lobbyId, timePerGifMs / 1000);
+  } catch (err) {
+    console.error('Error triggering next round:', err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -247,9 +288,9 @@ async function generateSessionSummary(
 // ---------------------------------------------------------------------------
 
 export function clearAllSessionTimers(): void {
-  for (const timer of sessionTimers.values()) {
-    clearTimeout(timer);
+  for (const pending of pendingRounds.values()) {
+    clearTimeout(pending.startTimer);
   }
-  sessionTimers.clear();
+  pendingRounds.clear();
   sessionConfigs.clear();
 }

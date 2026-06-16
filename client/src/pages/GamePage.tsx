@@ -15,10 +15,23 @@ interface RoundStartPayload {
 interface RoundWonPayload {
   winnerUsername: string;
   filmName: string;
+  releaseYear: number;
+  director: string | null;
+  leadActors: string;
+  trivia: string | null;
 }
 
 interface RoundTimeoutPayload {
   filmName: string;
+  releaseYear: number;
+  director: string | null;
+  leadActors: string;
+  trivia: string | null;
+}
+
+interface RoundPendingPayload {
+  nextRoundNumber: number;
+  autoStartInSeconds: number;
 }
 
 interface RoundCluePayload {
@@ -53,16 +66,21 @@ interface PlayerDisconnectedPayload {
 }
 
 type GamePhase =
-  | 'waiting'       // waiting for round to start (between rounds)
+  | 'waiting'       // waiting for round to start (before first round)
   | 'active'        // round in progress
   | 'round-result'  // showing round result briefly
-  | 'session-end'   // all 3 rounds done
+  | 'round-pending' // between rounds: countdown + host "Start Next Round" button
+  | 'session-end'   // all rounds done
   | 'disconnected';
 
 interface RoundResult {
   type: 'won' | 'timeout';
   winnerUsername?: string;
   filmName: string;
+  releaseYear?: number;
+  director?: string | null;
+  leadActors?: string;
+  trivia?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +90,7 @@ interface RoundResult {
 interface GamePageProps {
   lobbyId: string;
   initialRound?: { roundNumber: number; gifUrl: string; players?: { playerId: string; username: string }[] } | null;
+  isHost?: boolean;
   onBack: () => void;
 }
 
@@ -81,7 +100,7 @@ interface GamePageProps {
 
 let feedIdCounter = 0;
 
-export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: GamePageProps) {
+export default function GamePage({ lobbyId: _lobbyId, initialRound, isHost = false, onBack }: GamePageProps) {
   const { socket, connected } = useSocket();
   const [phase, setPhase] = useState<GamePhase>('waiting');
   const [socketError, setSocketError] = useState('');
@@ -92,7 +111,11 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
   const [timer, setTimer] = useState(0);
   const [clue, setClue] = useState<{ type: string; text: string } | null>(null);
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
-  const [betweenRoundCountdown, setBetweenRoundCountdown] = useState(0);
+
+  // Between-round pending state
+  const [nextRoundNumber, setNextRoundNumber] = useState(0);
+  const [pendingCountdown, setPendingCountdown] = useState(0);
+  const pendingCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Feed state
   const [feedEntries, setFeedEntries] = useState<FeedEntry[]>([]);
@@ -149,7 +172,7 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
       setClue(null);
       setRoundResult(null);
       setFeedEntries([]);
-      setBetweenRoundCountdown(0);
+      setPendingCountdown(0);
       clueReceivedRef.current = false;
       startCountdown(120);
     }
@@ -165,13 +188,18 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
     if (!socket) return;
 
     function handleRoundStart(payload: RoundStartPayload) {
+      // Clear any pending countdown
+      if (pendingCountdownRef.current) {
+        clearInterval(pendingCountdownRef.current);
+        pendingCountdownRef.current = null;
+      }
       setPhase('active');
       setRoundNumber(payload.roundNumber);
       setGifUrl(payload.gifUrl);
       setClue(null);
       setRoundResult(null);
       setFeedEntries([]);
-      setBetweenRoundCountdown(0);
+      setPendingCountdown(0);
       clueReceivedRef.current = false;
       startCountdown(120);
     }
@@ -188,9 +216,12 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
         type: 'won',
         winnerUsername: payload.winnerUsername,
         filmName: payload.filmName,
+        releaseYear: payload.releaseYear,
+        director: payload.director,
+        leadActors: payload.leadActors,
+        trivia: payload.trivia,
       });
       setPhase('round-result');
-      startBetweenRoundCountdown();
     }
 
     function handleRoundTimeout(payload: RoundTimeoutPayload) {
@@ -198,9 +229,30 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
       setRoundResult({
         type: 'timeout',
         filmName: payload.filmName,
+        releaseYear: payload.releaseYear,
+        director: payload.director,
+        leadActors: payload.leadActors,
+        trivia: payload.trivia,
       });
       setPhase('round-result');
-      startBetweenRoundCountdown();
+    }
+
+    function handleRoundPending(payload: RoundPendingPayload) {
+      setNextRoundNumber(payload.nextRoundNumber);
+      setPendingCountdown(payload.autoStartInSeconds);
+      setPhase('round-pending');
+
+      // Start client-side countdown
+      if (pendingCountdownRef.current) clearInterval(pendingCountdownRef.current);
+      let remaining = payload.autoStartInSeconds;
+      pendingCountdownRef.current = setInterval(() => {
+        remaining -= 1;
+        setPendingCountdown(remaining);
+        if (remaining <= 0 && pendingCountdownRef.current) {
+          clearInterval(pendingCountdownRef.current);
+          pendingCountdownRef.current = null;
+        }
+      }, 1000);
     }
 
     function handleGuessNew(payload: GuessNewPayload) {
@@ -232,7 +284,11 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
 
     function handleSessionEnd(payload: SessionEndPayload) {
       stopTimer();
-      setBetweenRoundCountdown(0);
+      if (pendingCountdownRef.current) {
+        clearInterval(pendingCountdownRef.current);
+        pendingCountdownRef.current = null;
+      }
+      setPendingCountdown(0);
       setSessionScores(payload.scores);
       setSessionSummary(payload.sessionSummary);
       setPhase('session-end');
@@ -255,6 +311,7 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
     socket.on('round:clue', handleRoundClue);
     socket.on('round:won', handleRoundWon);
     socket.on('round:timeout', handleRoundTimeout);
+    socket.on('round:pending', handleRoundPending);
     socket.on('guess:new', handleGuessNew);
     socket.on('chat:new', handleChatNew);
     socket.on('session:end', handleSessionEnd);
@@ -267,6 +324,7 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
       socket.off('round:clue', handleRoundClue);
       socket.off('round:won', handleRoundWon);
       socket.off('round:timeout', handleRoundTimeout);
+      socket.off('round:pending', handleRoundPending);
       socket.off('guess:new', handleGuessNew);
       socket.off('chat:new', handleChatNew);
       socket.off('session:end', handleSessionEnd);
@@ -280,19 +338,12 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (pendingCountdownRef.current) clearInterval(pendingCountdownRef.current);
     };
   }, []);
 
-  // Helper for between-round countdown
-  function startBetweenRoundCountdown() {
-    setBetweenRoundCountdown(5);
-    let count = 5;
-    const iv = setInterval(() => {
-      count--;
-      setBetweenRoundCountdown(count);
-      if (count <= 0) clearInterval(iv);
-    }, 1000);
-  }
+  // Helper for between-round countdown — kept for compatibility, now unused
+  // (removed startBetweenRoundCountdown)
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -300,6 +351,10 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
 
   function handleSubmitGuess(text: string) {
     socket?.emit('guess:submit', { text });
+  }
+
+  function handleStartNextRound() {
+    socket?.emit('round:next', {});
   }
 
   // ---------------------------------------------------------------------------
@@ -347,9 +402,7 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
         <div style={styles.center}>
           <h2 style={{ color: colors.textPrimary }}>🎬 Guess the GIF</h2>
           <p style={{ color: colors.textSecondary }}>
-            {betweenRoundCountdown > 0
-              ? `Next round in ${betweenRoundCountdown}s…`
-              : 'Waiting for the round to start…'}
+            Waiting for the round to start…
           </p>
           {socketError && (
             <p style={{ color: colors.error, fontSize: 14, marginTop: 12 }}>
@@ -361,6 +414,65 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
               Back to Lobbies
             </button>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Round pending (between rounds — countdown + start button)
+  // ---------------------------------------------------------------------------
+
+  if (phase === 'round-pending') {
+    return (
+      <div style={styles.wrapper}>
+        <div style={styles.container}>
+          {/* Round result (still visible during pending) */}
+          {roundResult && (
+            <div style={styles.resultBox}>
+              {roundResult.type === 'won' ? (
+                <div style={{ marginBottom: 4 }}>✅ WINNER: <strong>{roundResult.winnerUsername}</strong> 🔥 🔥</div>
+              ) : (
+                <div style={{ marginBottom: 4 }}>⏰ Time's up! Nobody guessed it.</div>
+              )}
+              <div style={styles.filmReveal}>{roundResult.filmName}</div>
+              <div style={styles.metadataList}>
+                {roundResult.releaseYear && (
+                  <div style={styles.metadataItem}>📅 {roundResult.releaseYear}</div>
+                )}
+                {roundResult.director && (
+                  <div style={styles.metadataItem}>🎥 {roundResult.director}</div>
+                )}
+                {roundResult.leadActors && (
+                  <div style={styles.metadataItem}>⭐️ {roundResult.leadActors}</div>
+                )}
+                {roundResult.trivia && (
+                  <div style={styles.metadataItem}>🤔 {roundResult.trivia}</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div style={styles.pendingBox}>
+            <div style={styles.pendingTitle}>Round {nextRoundNumber} coming up</div>
+            <div style={styles.pendingCountdown}>
+              {pendingCountdown > 0
+                ? `Starts in ${pendingCountdown}s`
+                : 'Starting…'}
+            </div>
+            {isHost ? (
+              <button
+                onClick={handleStartNextRound}
+                style={{ ...styles.primaryBtn, marginTop: 0 }}
+              >
+                ▶ Start Next Round
+              </button>
+            ) : (
+              <p style={{ color: colors.textMuted, fontSize: 14, margin: 0 }}>
+                Waiting for the host to start next round…
+              </p>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -497,23 +609,25 @@ export default function GamePage({ lobbyId: _lobbyId, initialRound, onBack }: Ga
         {showResult && roundResult && (
           <div style={styles.resultBox}>
             {roundResult.type === 'won' ? (
-              <>
-                <span style={styles.resultIcon}>🎉</span>
-                <strong>{roundResult.winnerUsername}</strong> guessed it!
-                <div style={styles.filmReveal}>{roundResult.filmName}</div>
-              </>
+              <div style={{ marginBottom: 4 }}>✅ WINNER: <strong>{roundResult.winnerUsername}</strong> 🔥 🔥</div>
             ) : (
-              <>
-                <span style={styles.resultIcon}>⏰</span>
-                Time's up! The film was:
-                <div style={styles.filmReveal}>{roundResult.filmName}</div>
-              </>
+              <div style={{ marginBottom: 4 }}>⏰ Time's up! Nobody guessed it.</div>
             )}
-            {betweenRoundCountdown > 0 && (
-              <div style={styles.nextRound}>
-                Next round in {betweenRoundCountdown}s…
-              </div>
-            )}
+            <div style={styles.filmReveal}>{roundResult.filmName}</div>
+            <div style={styles.metadataList}>
+              {roundResult.releaseYear && (
+                <div style={styles.metadataItem}>📅 {roundResult.releaseYear}</div>
+              )}
+              {roundResult.director && (
+                <div style={styles.metadataItem}>🎥 {roundResult.director}</div>
+              )}
+              {roundResult.leadActors && (
+                <div style={styles.metadataItem}>⭐️ {roundResult.leadActors}</div>
+              )}
+              {roundResult.trivia && (
+                <div style={styles.metadataItem}>🤔 {roundResult.trivia}</div>
+              )}
+            </div>
           </div>
         )}
 
@@ -648,10 +762,38 @@ const styles: Record<string, React.CSSProperties> = {
     color: colors.primary,
     marginTop: 6,
   },
-  nextRound: {
-    marginTop: 8,
+  metadataList: {
+    marginTop: 12,
+    textAlign: 'left' as const,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 6,
+  },
+  metadataItem: {
     fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 1.4,
+  },
+  pendingBox: {
+    background: colors.surface,
+    border: `1px solid ${colors.surfaceBorder}`,
+    borderRadius: radii.card,
+    padding: '20px 16px',
+    textAlign: 'center' as const,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 12,
+    alignItems: 'center',
+  },
+  pendingTitle: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: colors.textPrimary,
+  },
+  pendingCountdown: {
+    fontSize: 15,
     color: colors.textMuted,
+    fontVariantNumeric: 'tabular-nums',
   },
   primaryBtn: {
     ...commonStyles.primaryButton,

@@ -21,6 +21,7 @@ export interface ClientToServerEvents {
   'guess:submit': (payload: GuessSubmitPayload) => void;
   'chat:message': (payload: ChatMessagePayload) => void;
   'session:start': (payload: SessionStartPayload) => void;
+  'round:next': (payload: Record<string, never>) => void;
 }
 
 // ============================================================
@@ -32,13 +33,26 @@ export interface RoundStartPayload {
   gifUrl: string;
 }
 
+export interface RoundPendingPayload {
+  nextRoundNumber: number;
+  autoStartInSeconds: number;
+}
+
 export interface RoundWonPayload {
   winnerUsername: string;
   filmName: string;
+  releaseYear: number;
+  director: string | null;
+  leadActors: string;
+  trivia: string | null;
 }
 
 export interface RoundTimeoutPayload {
   filmName: string;
+  releaseYear: number;
+  director: string | null;
+  leadActors: string;
+  trivia: string | null;
 }
 
 export interface RoundCluePayload {
@@ -99,6 +113,7 @@ export interface LeaderboardUpdateEntry {
 
 export interface ServerToClientEvents {
   'round:start': (payload: RoundStartPayload) => void;
+  'round:pending': (payload: RoundPendingPayload) => void;
   'round:won': (payload: RoundWonPayload) => void;
   'round:timeout': (payload: RoundTimeoutPayload) => void;
   'round:clue': (payload: RoundCluePayload) => void;

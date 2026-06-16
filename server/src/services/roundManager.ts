@@ -114,9 +114,9 @@ export async function submitGuess(
   lobbyId: string
 ): Promise<GuessResult> {
   return withRoundLock(roundId, async () => {
-    // Fetch round + associated GIF film name
+    // Fetch round + associated GIF film name and metadata
     const roundResult = await pool.query(
-      `SELECT r.*, g.film_name
+      `SELECT r.*, g.film_name, g.release_year, g.director, g.lead_actors, g.trivia
          FROM rounds r
          JOIN gifs g ON g.id = r.gif_id
         WHERE r.id = $1`,
@@ -129,6 +129,10 @@ export async function submitGuess(
 
     const round = roundResult.rows[0];
     const filmName: string = round.film_name;
+    const releaseYear: number = round.release_year;
+    const director: string | null = round.director;
+    const leadActors: string = round.lead_actors;
+    const trivia: string | null = round.trivia;
 
     // Only accept guesses on active or clue_given rounds
     if (
@@ -193,6 +197,10 @@ export async function submitGuess(
       io.to(lobbyId).emit('round:won', {
         winnerUsername: username,
         filmName,
+        releaseYear,
+        director,
+        leadActors,
+        trivia,
       });
 
       // Also broadcast the winning guess to the feed
@@ -327,7 +335,7 @@ async function handleTimeout(
 ): Promise<void> {
   // Re-check round status
   const roundResult = await pool.query(
-    `SELECT r.status, g.film_name
+    `SELECT r.status, g.film_name, g.release_year, g.director, g.lead_actors, g.trivia
        FROM rounds r
        JOIN gifs g ON g.id = r.gif_id
       WHERE r.id = $1`,
@@ -348,9 +356,13 @@ async function handleTimeout(
   // Clear timer entry
   roundTimers.delete(roundId);
 
-  // Broadcast round:timeout with film name
+  // Broadcast round:timeout with film metadata
   io.to(lobbyId).emit('round:timeout', {
     filmName: row.film_name,
+    releaseYear: row.release_year,
+    director: row.director,
+    leadActors: row.lead_actors,
+    trivia: row.trivia,
   });
 
   // Trigger session orchestrator to handle next round or session end

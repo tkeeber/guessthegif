@@ -33,6 +33,8 @@ interface Gif {
   lead_actors: string;
   release_year: number;
   theme: string;
+  director: string | null;
+  trivia: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -88,6 +90,8 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   const [leadActors, setLeadActors] = useState('');
   const [releaseYear, setReleaseYear] = useState('');
   const [theme, setTheme] = useState('');
+  const [director, setDirector] = useState('');
+  const [trivia, setTrivia] = useState('');
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -100,7 +104,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ filmName: string; leadActors: string; releaseYear: string; theme: string }>({ filmName: '', leadActors: '', releaseYear: '', theme: '' });
+  const [editForm, setEditForm] = useState<{ filmName: string; leadActors: string; releaseYear: string; theme: string; director: string; trivia: string }>({ filmName: '', leadActors: '', releaseYear: '', theme: '', director: '', trivia: '' });
 
   const [error, setError] = useState('');
 
@@ -194,6 +198,8 @@ export default function AdminPage({ onBack }: AdminPageProps) {
           leadActors: leadActors.trim(),
           releaseYear: parseInt(releaseYear, 10),
           theme: theme.trim(),
+          director: director.trim() || undefined,
+          trivia: trivia.trim() || undefined,
         }),
       });
       setSaveSuccess('GIF saved to library!');
@@ -208,6 +214,8 @@ export default function AdminPage({ onBack }: AdminPageProps) {
       setLeadActors('');
       setReleaseYear('');
       setTheme('');
+      setDirector('');
+      setTrivia('');
       loadLibrary();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Failed to save GIF');
@@ -229,7 +237,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   // Edit
   const startEdit = (gif: Gif) => {
     setEditingId(gif.id);
-    setEditForm({ filmName: gif.film_name, leadActors: gif.lead_actors, releaseYear: String(gif.release_year), theme: gif.theme });
+    setEditForm({ filmName: gif.film_name, leadActors: gif.lead_actors, releaseYear: String(gif.release_year), theme: gif.theme, director: gif.director || '', trivia: gif.trivia || '' });
   };
 
   const handleUpdate = async () => {
@@ -242,6 +250,8 @@ export default function AdminPage({ onBack }: AdminPageProps) {
           leadActors: editForm.leadActors,
           releaseYear: parseInt(editForm.releaseYear, 10),
           theme: editForm.theme,
+          director: editForm.director || null,
+          trivia: editForm.trivia || null,
         }),
       });
       setEditingId(null);
@@ -348,6 +358,14 @@ export default function AdminPage({ onBack }: AdminPageProps) {
               <label style={styles.label}>Theme / Genre</label>
               <input style={styles.fieldInput} value={theme} onChange={(e) => setTheme(e.target.value)} />
             </div>
+            <div>
+              <label style={styles.label}>Director (optional)</label>
+              <input style={styles.fieldInput} value={director} onChange={(e) => setDirector(e.target.value)} placeholder="e.g. Christopher Nolan" />
+            </div>
+            <div>
+              <label style={styles.label}>Trivia (optional)</label>
+              <input style={styles.fieldInput} value={trivia} onChange={(e) => setTrivia(e.target.value)} placeholder="Fun fact about the film…" />
+            </div>
           </div>
           <div style={{ marginBottom: 8 }}>
             <strong style={{ fontSize: 13, color: colors.textPrimary }}>Selected GIF:</strong>{' '}
@@ -375,6 +393,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                 <th style={styles.th}>Film</th>
                 <th style={styles.th}>Year</th>
                 <th style={styles.th}>Actors</th>
+                <th style={styles.th}>Director</th>
                 <th style={styles.th}>Theme</th>
                 <th style={styles.th}>Active</th>
                 <th style={styles.th}>Actions</th>
@@ -395,6 +414,9 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                         <input style={{ ...styles.fieldInput, width: 140 }} value={editForm.leadActors} onChange={(e) => setEditForm({ ...editForm, leadActors: e.target.value })} />
                       </td>
                       <td style={styles.td}>
+                        <input style={{ ...styles.fieldInput, width: 120 }} value={editForm.director} onChange={(e) => setEditForm({ ...editForm, director: e.target.value })} />
+                      </td>
+                      <td style={styles.td}>
                         <input style={{ ...styles.fieldInput, width: 100 }} value={editForm.theme} onChange={(e) => setEditForm({ ...editForm, theme: e.target.value })} />
                       </td>
                       <td style={styles.td}>{gif.is_active ? '✅' : '❌'}</td>
@@ -408,6 +430,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                       <td style={styles.td}>{gif.film_name}</td>
                       <td style={styles.td}>{gif.release_year}</td>
                       <td style={styles.td}>{gif.lead_actors}</td>
+                      <td style={styles.td}>{gif.director || '—'}</td>
                       <td style={styles.td}>{gif.theme}</td>
                       <td style={styles.td}>{gif.is_active ? '✅' : '❌'}</td>
                       <td style={styles.td}>

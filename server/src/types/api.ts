@@ -104,6 +104,8 @@ export interface CreateGifRequest {
   leadActors: string;
   releaseYear: number;
   theme: string;
+  director?: string;
+  trivia?: string;
 }
 
 export interface CreateGifResponse {
@@ -119,6 +121,8 @@ export interface UpdateGifRequest {
   leadActors?: string;
   releaseYear?: number;
   theme?: string;
+  director?: string;
+  trivia?: string;
 }
 
 export interface UpdateGifResponse {

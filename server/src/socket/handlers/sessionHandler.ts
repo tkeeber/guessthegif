@@ -1,6 +1,6 @@
 import pool from '../../db';
 import { startSession, SessionError } from '../../services/sessionService';
-import { startFirstRound } from '../../services/sessionOrchestrator';
+import { startFirstRound, triggerNextRound } from '../../services/sessionOrchestrator';
 import { TypedServer, AuthenticatedSocket } from '../index';
 import { SessionStartPayload, WSErrorPayload } from '../../types/websocket';
 
@@ -75,6 +75,37 @@ export function registerSessionHandler(
         };
         socket.emit('error' as any, errorPayload);
       }
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // round:next — host skips the auto-start timer to begin the next round now
+  // -------------------------------------------------------------------------
+  socket.on('round:next', async () => {
+    const playerId = socket.data.playerId;
+
+    try {
+      // Find the active session for a lobby where this player is the host
+      const result = await pool.query(
+        `SELECT s.id AS session_id
+           FROM sessions s
+           JOIN lobbies l ON l.id = s.lobby_id
+          WHERE l.host_id = $1
+            AND s.status = 'active'
+          ORDER BY s.created_at DESC
+          LIMIT 1`,
+        [playerId]
+      );
+
+      if (result.rows.length === 0) {
+        // Not a host with an active session — silently ignore
+        return;
+      }
+
+      const sessionId = result.rows[0].session_id;
+      await triggerNextRound(io, sessionId);
+    } catch (err) {
+      console.error('[round:next] Error:', err);
     }
   });
 }
