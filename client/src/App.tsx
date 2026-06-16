@@ -156,7 +156,7 @@ function AppContent() {
       <GamePage
         lobbyId={lobbyInfo.lobbyId}
         initialRound={initialRound}
-        isHost={!lobbyInfo.hostId || lobbyInfo.hostId === user.id}
+        isHost={initialRound?.isHost ?? (!lobbyInfo.hostId)}
         onBack={handleBackToList}
       />
     );
